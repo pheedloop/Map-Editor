@@ -85,11 +85,13 @@ function SidebarHeader({
   onMapNameChange,
   editorMode,
   onEditorModeChange,
+  isDirty,
 }: {
   mapName: string;
   onMapNameChange: (name: string) => void;
   editorMode: EditorMode;
   onEditorModeChange: (mode: EditorMode) => void;
+  isDirty?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(mapName);
@@ -115,6 +117,9 @@ function SidebarHeader({
 
   return (
     <div className="px-3 py-3 border-b border-gray-100 flex items-center gap-2 min-w-0">
+      {isDirty && (
+        <span className="shrink-0 text-red-500 font-bold text-sm leading-none" title="Unsaved changes">*</span>
+      )}
       {editing ? (
         <input
           ref={inputRef}
@@ -215,6 +220,7 @@ interface ToolSidebarProps {
   onEditorModeChange: (mode: EditorMode) => void;
   mapName: string;
   onMapNameChange: (name: string) => void;
+  isDirty?: boolean;
   placementRecords: PlacementRecords;
   onAutoArrange: (type: "booth" | "session_area" | "meeting_room", records: AutoArrangeRecord[]) => void;
 }
@@ -231,6 +237,7 @@ export function ToolSidebar({
   onEditorModeChange,
   mapName,
   onMapNameChange,
+  isDirty,
   placementRecords,
   onAutoArrange,
 }: ToolSidebarProps) {
@@ -272,6 +279,7 @@ export function ToolSidebar({
         onMapNameChange={onMapNameChange}
         editorMode={editorMode}
         onEditorModeChange={onEditorModeChange}
+        isDirty={isDirty}
       />
 
       {/* Tab content */}
