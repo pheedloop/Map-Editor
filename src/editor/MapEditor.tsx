@@ -58,6 +58,7 @@ import type {
   LayerId,
   LayerDefinition,
 } from "../types";
+import type { ExhibitorBooth, SessionLocation, MeetingRoom } from "../viewer/types";
 import {
   DEFAULT_LAYERS,
   ELEMENT_TYPE_TO_LAYER,
@@ -72,12 +73,18 @@ const INITIAL_DEFAULTS: DrawingDefaults = {
 
 interface MapEditorProps {
   initialData: FloorPlanData;
+  booths?: ExhibitorBooth[];
+  sessions?: SessionLocation[];
+  meetingRooms?: MeetingRoom[];
   debug?: boolean;
   persist?: boolean;
 }
 
 export function MapEditor({
   initialData,
+  booths = [],
+  sessions = [],
+  meetingRooms = [],
   debug: debugProp,
   persist,
 }: MapEditorProps) {
@@ -125,7 +132,7 @@ export function MapEditor({
   const [activeLayerId, _setActiveLayerId] = useState<LayerId>("content");
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   const [editorMode, setEditorMode] = useState<EditorMode>("design");
-  const placementRecords = usePlacementRecords(data);
+  const placementRecords = usePlacementRecords(data, booths, sessions, meetingRooms);
 
   const unlinkedElementIds = useMemo(() => {
     const ids = new Set<string>();

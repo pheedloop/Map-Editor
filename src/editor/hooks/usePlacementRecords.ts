@@ -1,9 +1,6 @@
 import { useMemo } from "react";
 import type { FloorPlanData } from "../../types";
 import type { ExhibitorBooth, SessionLocation, MeetingRoom } from "../../viewer/types";
-import { conferenceExpoBooths } from "../../sample-data/sample-booths";
-import { sampleSessionLocations } from "../../sample-data/sample-session-locations";
-import { sampleMeetingRooms } from "../../sample-data/sample-meeting-rooms";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -36,18 +33,15 @@ export interface PlacementRecords {
 // Hook
 // ---------------------------------------------------------------------------
 
-/**
- * Derives the placement record pool from sample data and marks each record
- * as placed or unplaced by scanning the current map's elements.
- *
- * Phase 15: swap the three sample imports for API calls without changing the
- * return shape — consumers are decoupled from the data source.
- */
-export function usePlacementRecords(data: FloorPlanData): PlacementRecords {
+export function usePlacementRecords(
+  data: FloorPlanData,
+  boothRecords: ExhibitorBooth[],
+  sessionRecords: SessionLocation[],
+  meetingRoomRecords: MeetingRoom[],
+): PlacementRecords {
   return useMemo(() => {
     const elements = data.elements;
 
-    // Build O(1) lookup sets from placed element properties
     const placedBoothSlugs = new Set(
       elements
         .map((el) => el.properties.boothSlug)
@@ -66,17 +60,17 @@ export function usePlacementRecords(data: FloorPlanData): PlacementRecords {
         .filter((id): id is string => Boolean(id))
     );
 
-    const booths: PlacedRecord<ExhibitorBooth>[] = conferenceExpoBooths.map((record) => ({
+    const booths: PlacedRecord<ExhibitorBooth>[] = boothRecords.map((record) => ({
       record,
       isPlaced: placedBoothSlugs.has(record.slug),
     }));
 
-    const sessions: PlacedRecord<SessionLocation>[] = sampleSessionLocations.map((record) => ({
+    const sessions: PlacedRecord<SessionLocation>[] = sessionRecords.map((record) => ({
       record,
       isPlaced: placedSessionIds.has(String(record.id)),
     }));
 
-    const meetingRooms: PlacedRecord<MeetingRoom>[] = sampleMeetingRooms.map((record) => ({
+    const meetingRooms: PlacedRecord<MeetingRoom>[] = meetingRoomRecords.map((record) => ({
       record,
       isPlaced: placedRoomIds.has(String(record.id)),
     }));
@@ -93,9 +87,9 @@ export function usePlacementRecords(data: FloorPlanData): PlacementRecords {
       boothCounts:   countOf(booths),
       sessionCounts: countOf(sessions),
       roomCounts:    countOf(meetingRooms),
-      knownBoothSlugs: new Set(conferenceExpoBooths.map((r) => r.slug)),
-      knownSessionIds: new Set(sampleSessionLocations.map((r) => String(r.id))),
-      knownRoomIds:    new Set(sampleMeetingRooms.map((r) => String(r.id))),
+      knownBoothSlugs: new Set(boothRecords.map((r) => r.slug)),
+      knownSessionIds: new Set(sessionRecords.map((r) => String(r.id))),
+      knownRoomIds:    new Set(meetingRoomRecords.map((r) => String(r.id))),
     };
-  }, [data.elements]);
+  }, [data.elements, boothRecords, sessionRecords, meetingRoomRecords]);
 }
