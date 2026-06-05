@@ -58,6 +58,7 @@ import type {
   LayerId,
   LayerDefinition,
 } from "../types";
+import type { ExhibitorBooth, SessionLocation, MeetingRoom } from "../viewer/types";
 import {
   DEFAULT_LAYERS,
   ELEMENT_TYPE_TO_LAYER,
@@ -72,12 +73,22 @@ const INITIAL_DEFAULTS: DrawingDefaults = {
 
 interface MapEditorProps {
   initialData: FloorPlanData;
+  booths?: ExhibitorBooth[];
+  sessions?: SessionLocation[];
+  meetingRooms?: MeetingRoom[];
+  onSave?: (data: FloorPlanData) => Promise<void>;
+  onDirtyChange?: (isDirty: boolean) => void;
   debug?: boolean;
   persist?: boolean;
 }
 
 export function MapEditor({
   initialData,
+  booths = [],
+  sessions = [],
+  meetingRooms = [],
+  onSave,
+  onDirtyChange,
   debug: debugProp,
   persist,
 }: MapEditorProps) {
@@ -125,7 +136,49 @@ export function MapEditor({
   const [activeLayerId, _setActiveLayerId] = useState<LayerId>("content");
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   const [editorMode, setEditorMode] = useState<EditorMode>("design");
-  const placementRecords = usePlacementRecords(data);
+  const placementRecords = usePlacementRecords(data, booths, sessions, meetingRooms);
+
+  // --- Save state ---
+  // cleanDataRef holds the data reference at the last save (or initial load).
+  // Comparing by reference works because useHistory returns the exact same object
+  // until a new action is dispatched, so this is safe and avoids deep equality checks.
+  const cleanDataRef = useRef(data);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setIsDirty(data !== cleanDataRef.current);
+  }, [data]);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
+  const handleSaveRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  const handleSave = useCallback(async () => {
+    if (!onSave || isSaving) return;
+    setIsSaving(true);
+    try {
+      await onSave(data);
+      cleanDataRef.current = data;
+      setIsDirty(false);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [onSave, isSaving, data]);
+  handleSaveRef.current = handleSave;
+
+  useEffect(() => {
+    if (!onSave) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        handleSaveRef.current?.();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onSave]);
 
   const unlinkedElementIds = useMemo(() => {
     const ids = new Set<string>();
@@ -1266,6 +1319,17 @@ export function MapEditor({
         onHelpClick={() => setShowHelp(true)}
         onLegendClick={() => setShowLegendDialog(true)}
         fileMenuItems={[
+          ...(onSave
+            ? [
+                {
+                  label: isSaving ? "Saving…" : "Save",
+                  shortcut: `${modKey}S`,
+                  disabled: isSaving,
+                  onClick: handleSave,
+                },
+                { type: "divider" as const },
+              ]
+            : []),
           {
             label: "Export as PNG",
             onClick: () => {
@@ -1426,6 +1490,7 @@ export function MapEditor({
           onEditorModeChange={setEditorMode}
           mapName={data.name}
           onMapNameChange={setMapName}
+          isDirty={isDirty}
           placementRecords={placementRecords}
           onAutoArrange={handleAutoArrange}
         />
