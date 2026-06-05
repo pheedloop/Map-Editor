@@ -2,6 +2,9 @@
   "name": "@pheedloop/map-editor",
   "version": "0.1.0",
   "type": "module",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "exports": {
     "./editor": {
       "import": "./dist/editor.js",
@@ -18,8 +21,10 @@
   ],
   "scripts": {
     "dev": "vite",
+    "dev:lib": "vite build --config vite.lib.config.ts --watch",
     "build": "tsc -b && vite build",
     "build:lib": "vite build --config vite.lib.config.ts",
+    "prepublishOnly": "npm run build:lib",
     "lint": "eslint .",
     "preview": "vite preview",
     "prepare": "husky"

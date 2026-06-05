@@ -1,0 +1,26 @@
+name: Publish Package
+
+on:
+  push:
+    tags:
+      - 'v*' # publish on version tags like v0.2.0
+  workflow_dispatch: # ...or manually from the Actions tab
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # required to publish to GitHub Packages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://npm.pkg.github.com' # writes the auth .npmrc for us
+          scope: '@pheedloop'
+      - run: npm ci
+      - run: npm run build:lib
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # auto-provided, no PAT needed
