@@ -11,6 +11,9 @@ import { Roadmap } from "./roadmap/Roadmap";
 import { KnownIssues } from "./roadmap/KnownIssues";
 import { exhibitionHallMap } from "./sample-data/exhibition-hall-map";
 import { conferenceExpoExhibitors } from "./sample-data/sample-exhibitors";
+import { conferenceExpoBooths } from "./sample-data/sample-booths";
+import { sampleSessionLocations } from "./sample-data/sample-session-locations";
+import { sampleMeetingRooms } from "./sample-data/sample-meeting-rooms";
 import type { FloorPlanData } from "./types";
 import type { ViewerMode } from "./viewer/types";
 
@@ -173,7 +176,14 @@ function App() {
       </nav>
       <div className="flex-1 overflow-hidden">
         {route === "editor" && (
-          <MapEditor initialData={exhibitionHallMap} persist debug />
+          <MapEditor
+            initialData={exhibitionHallMap}
+            booths={conferenceExpoBooths}
+            sessions={sampleSessionLocations}
+            meetingRooms={sampleMeetingRooms}
+            persist
+            debug
+          />
         )}
         {route === "viewer" && (
           <ViewerRoute viewport={viewport} mode={viewerMode} />
