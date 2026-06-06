@@ -120,7 +120,7 @@ export function MapViewer({ data, exhibitors, mode = "attendee" }: MapViewerProp
   const showDirectionsButton = mode === "attendee" && directions.hasGrid && !directions.active;
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full relative">
+    <div ref={containerRef} className="pl-map-editor flex flex-col h-full relative">
       <div className="flex items-center gap-0 bg-white">
         <div className="flex-1 min-w-0">
           <SearchBar

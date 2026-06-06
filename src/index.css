@@ -95,30 +95,32 @@
     --font-medium: 500;
     --font-semibold: 600;
 
+    /* Type scale aligned to the Ditto dashboard (globals.css --font-size-*),
+       so the standalone dev app previews the same sizes the host renders. */
     --text-xxs: 10px;
     --line-height-xxs: 12px;
-    --text-xs: 12px;
-    --line-height-xs: 16px;
-    --text-sm: 14px;
-    --line-height-sm: 20px;
-    --text-base: 16px;
-    --line-height-base: 24px;
-    --text-lg: 18px;
-    --line-height-lg: 28px;
-    --text-xl: 20px;
+    --text-xs: 10px;
+    --line-height-xs: 12px;
+    --text-sm: 12px;
+    --line-height-sm: 16px;
+    --text-base: 14px;
+    --line-height-base: 20px;
+    --text-lg: 16px;
+    --line-height-lg: 24px;
+    --text-xl: 18px;
     --line-height-xl: 28px;
-    --text-2xl: 24px;
-    --line-height-2xl: 32px;
-    --text-3xl: 30px;
-    --line-height-3xl: 36px;
-    --text-4xl: 36px;
-    --line-height-4xl: 44px;
-    --text-5xl: 48px;
-    --line-height-5xl: 58px;
-    --text-6xl: 60px;
-    --line-height-6xl: 72px;
-    --text-7xl: 72px;
-    --line-height-7xl: 86px;
+    --text-2xl: 20px;
+    --line-height-2xl: 28px;
+    --text-3xl: 24px;
+    --line-height-3xl: 32px;
+    --text-4xl: 30px;
+    --line-height-4xl: 36px;
+    --text-5xl: 36px;
+    --line-height-5xl: 44px;
+    --text-6xl: 48px;
+    --line-height-6xl: 58px;
+    --text-7xl: 60px;
+    --line-height-7xl: 72px;
 
     --spacing: 4px;
 

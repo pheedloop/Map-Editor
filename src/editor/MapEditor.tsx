@@ -1312,7 +1312,7 @@ export function MapEditor({
   );
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="pl-map-editor flex flex-col h-full overflow-hidden">
       <TopBar
         debug={debug}
         onDebugClick={() => setShowMapDebug(true)}
