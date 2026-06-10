@@ -11,6 +11,11 @@ export function BackgroundImage({ config }: BackgroundImageProps) {
 
   useEffect(() => {
     const img = new window.Image();
+    // Set crossOrigin before assigning src so a CDN-hosted background doesn't
+    // taint the Konva stage and break PNG export (stage.toDataURL throws
+    // SecurityError on a tainted canvas). Harmless on data: URLs, so it's
+    // applied unconditionally. Requires Access-Control-Allow-Origin on the host.
+    img.crossOrigin = "anonymous";
     img.onload = () => setImage(img);
     img.src = config.url;
   }, [config.url]);
