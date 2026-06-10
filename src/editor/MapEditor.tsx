@@ -11,9 +11,14 @@ import type {
 } from "./components/panels/PlacementPanel";
 import { getElementBounds } from "./utils/bounds";
 import {
-  alignLeft, alignRight, alignTop, alignBottom,
-  alignCenterH, alignCenterV,
-  distributeH, distributeV,
+  alignLeft,
+  alignRight,
+  alignTop,
+  alignBottom,
+  alignCenterH,
+  alignCenterV,
+  distributeH,
+  distributeV,
   arrangeAsGrid,
 } from "./utils/alignment";
 import type { DrawingDefaults } from "./components/panels/OptionsBar";
@@ -58,7 +63,11 @@ import type {
   LayerId,
   LayerDefinition,
 } from "../types";
-import type { ExhibitorBooth, SessionLocation, MeetingRoom } from "../viewer/types";
+import type {
+  ExhibitorBooth,
+  SessionLocation,
+  MeetingRoom,
+} from "../viewer/types";
 import {
   DEFAULT_LAYERS,
   ELEMENT_TYPE_TO_LAYER,
@@ -156,7 +165,12 @@ export function MapEditor({
   const [activeLayerId, _setActiveLayerId] = useState<LayerId>("content");
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   const [editorMode, setEditorMode] = useState<EditorMode>("design");
-  const placementRecords = usePlacementRecords(data, booths, sessions, meetingRooms);
+  const placementRecords = usePlacementRecords(
+    data,
+    booths,
+    sessions,
+    meetingRooms,
+  );
 
   // --- Save state ---
   // cleanDataRef holds the data reference at the last save (or initial load).
@@ -366,7 +380,8 @@ export function MapEditor({
   }, []);
 
   const getGroupMembers = useCallback(
-    (groupId: string) => data.elements.filter((el) => el.properties.groupId === groupId),
+    (groupId: string) =>
+      data.elements.filter((el) => el.properties.groupId === groupId),
     [data.elements],
   );
 
@@ -376,7 +391,10 @@ export function MapEditor({
     selectMany(els.map((el) => el.id));
 
     // Compute bounding box of all overlapping elements
-    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+    let left = Infinity,
+      right = -Infinity,
+      top = Infinity,
+      bottom = -Infinity;
     for (const el of els) {
       const b = getElementBounds(el);
       if (b.left < left) left = b.left;
@@ -389,14 +407,21 @@ export function MapEditor({
     const newScale = Math.min(
       (stageSize.width - padding * 2) / (right - left),
       (stageSize.height - padding * 2) / (bottom - top),
-      5
+      5,
     );
     setScale(newScale);
     setPosition({
       x: stageSize.width / 2 - ((left + right) / 2) * newScale,
       y: stageSize.height / 2 - ((top + bottom) / 2) * newScale,
     });
-  }, [overlappingElementIds, data.elements, selectMany, stageSize, setScale, setPosition]);
+  }, [
+    overlappingElementIds,
+    data.elements,
+    selectMany,
+    stageSize,
+    setScale,
+    setPosition,
+  ]);
 
   // Clipboard
   const { copy, paste, hasBuffer } = useClipboard();
@@ -529,13 +554,18 @@ export function MapEditor({
     const gid = first?.properties.groupId;
     if (!gid) return null;
     return [...selectedIds].every(
-      (id) => data.elements.find((el) => el.id === id)?.properties.groupId === gid,
-    ) ? gid : null;
+      (id) =>
+        data.elements.find((el) => el.id === id)?.properties.groupId === gid,
+    )
+      ? gid
+      : null;
   })();
   const canGroupSelection =
     isMultiSelect &&
     !optionsBarGroupId &&
-    [...selectedIds].every((id) => !data.elements.find((el) => el.id === id)?.properties.groupId);
+    [...selectedIds].every(
+      (id) => !data.elements.find((el) => el.id === id)?.properties.groupId,
+    );
 
   // When editing inside a group, strip groupId so each member is its own alignment unit
   const elementsForAlignment = useMemo(
@@ -717,31 +747,47 @@ export function MapEditor({
 
   const handleBackgroundImage = useCallback(
     (
-      dataUrl: string,
+      url: string,
       imageWidth: number,
       imageHeight: number,
       mode: "resize-canvas" | "fit-image",
     ) => {
+      // New uploads default to 1; replacing an existing background keeps the
+      // user's current opacity.
+      const opacity = data.backgroundImage?.opacity ?? 1;
       if (mode === "resize-canvas") {
         updateDimensions({ width: imageWidth, height: imageHeight });
         setBackgroundImage({
-          url: dataUrl,
+          url,
           width: imageWidth,
           height: imageHeight,
-          opacity: 0.3,
+          opacity,
         });
       } else {
         setBackgroundImage({
-          url: dataUrl,
+          url,
           width: data.dimensions.width,
           height: data.dimensions.height,
-          opacity: 0.3,
+          opacity,
         });
       }
       setShowBgDialog(false);
     },
-    [data.dimensions, setBackgroundImage, updateDimensions],
+    [
+      data.dimensions,
+      data.backgroundImage,
+      setBackgroundImage,
+      updateDimensions,
+    ],
   );
+
+  const handleRemoveBackground = useCallback(() => {
+    // Clear local state immediately (marks dirty; next save drops it). Notify
+    // the host fire-and-forget — a rejection must not restore the image, since
+    // the host surfaces its own errors and retains old files server-side.
+    setBackgroundImage(undefined);
+    void onRemoveBackgroundImage?.().catch(() => {});
+  }, [setBackgroundImage, onRemoveBackgroundImage]);
 
   const handleElementContextMenu = useCallback(
     (elementId: string, screenX: number, screenY: number) => {
@@ -749,7 +795,11 @@ export function MapEditor({
       const groupId = element?.properties.groupId;
       if (groupId && !activeGroupId) {
         // Right-clicking a group member: select the whole group
-        selectMany(data.elements.filter((el) => el.properties.groupId === groupId).map((el) => el.id));
+        selectMany(
+          data.elements
+            .filter((el) => el.properties.groupId === groupId)
+            .map((el) => el.id),
+        );
       } else if (!selectedIds.has(elementId)) {
         selectOne(elementId);
       }
@@ -794,21 +844,34 @@ export function MapEditor({
       if (!activeGroupId) {
         items.push({
           label: "Enter Group",
-          onClick: () => { setActiveGroupId(clickedGroupId); selectOne(contextMenu.elementId); setContextMenu(null); },
+          onClick: () => {
+            setActiveGroupId(clickedGroupId);
+            selectOne(contextMenu.elementId);
+            setContextMenu(null);
+          },
         });
       }
       items.push({
         label: "Ungroup",
-        onClick: () => { dissolveGroup(clickedGroupId); setActiveGroupId(null); setContextMenu(null); },
+        onClick: () => {
+          dissolveGroup(clickedGroupId);
+          setActiveGroupId(null);
+          setContextMenu(null);
+        },
       });
       items.push({ type: "divider" as const });
     } else if (
       selectedIds.size >= 2 &&
-      [...selectedIds].every((id) => !data.elements.find((el) => el.id === id)?.properties.groupId)
+      [...selectedIds].every(
+        (id) => !data.elements.find((el) => el.id === id)?.properties.groupId,
+      )
     ) {
       items.push({
         label: "Group",
-        onClick: () => { createGroup([...selectedIds]); setContextMenu(null); },
+        onClick: () => {
+          createGroup([...selectedIds]);
+          setContextMenu(null);
+        },
       });
       items.push({ type: "divider" as const });
     }
@@ -897,7 +960,15 @@ export function MapEditor({
       if (shiftKey) toggleSelect(id);
       else selectOne(id);
     },
-    [activeGroupId, data.elements, selectNone, selectOne, toggleSelect, selectMany, getGroupMembers],
+    [
+      activeGroupId,
+      data.elements,
+      selectNone,
+      selectOne,
+      toggleSelect,
+      selectMany,
+      getGroupMembers,
+    ],
   );
 
   const handleDoubleClick = useCallback(
@@ -907,7 +978,9 @@ export function MapEditor({
       if (!groupId) return;
       // Enter the group if the clicked element is part of the currently selected group
       const allSelectedInGroup = [...selectedIds].every(
-        (sid) => data.elements.find((el) => el.id === sid)?.properties.groupId === groupId,
+        (sid) =>
+          data.elements.find((el) => el.id === sid)?.properties.groupId ===
+          groupId,
       );
       if (allSelectedInGroup) {
         setActiveGroupId(groupId);
@@ -926,34 +999,71 @@ export function MapEditor({
   );
 
   const handleGroupTransformEnd = useCallback(
-    (updates: Array<{ id: string; geometry: Partial<import("../types").Geometry> }>) => {
+    (
+      updates: Array<{
+        id: string;
+        geometry: Partial<import("../types").Geometry>;
+      }>,
+    ) => {
       batchUpdateGeometry(updates);
     },
     [batchUpdateGeometry],
   );
 
-  const handleAlignLeft    = useCallback(() => { const u = alignLeft(elementsForAlignment);    if (u.length) batchUpdateGeometry(u); }, [elementsForAlignment, batchUpdateGeometry]);
-  const handleAlignRight   = useCallback(() => { const u = alignRight(elementsForAlignment);   if (u.length) batchUpdateGeometry(u); }, [elementsForAlignment, batchUpdateGeometry]);
-  const handleAlignTop     = useCallback(() => { const u = alignTop(elementsForAlignment);     if (u.length) batchUpdateGeometry(u); }, [elementsForAlignment, batchUpdateGeometry]);
-  const handleAlignBottom  = useCallback(() => { const u = alignBottom(elementsForAlignment);  if (u.length) batchUpdateGeometry(u); }, [elementsForAlignment, batchUpdateGeometry]);
-  const handleAlignCenterH = useCallback(() => { const u = alignCenterH(elementsForAlignment); if (u.length) batchUpdateGeometry(u); }, [elementsForAlignment, batchUpdateGeometry]);
-  const handleAlignCenterV = useCallback(() => { const u = alignCenterV(elementsForAlignment); if (u.length) batchUpdateGeometry(u); }, [elementsForAlignment, batchUpdateGeometry]);
-  const handleDistributeH  = useCallback(() => { const u = distributeH(elementsForAlignment);  if (u.length) batchUpdateGeometry(u); }, [elementsForAlignment, batchUpdateGeometry]);
-  const handleDistributeV  = useCallback(() => { const u = distributeV(elementsForAlignment);  if (u.length) batchUpdateGeometry(u); }, [elementsForAlignment, batchUpdateGeometry]);
+  const handleAlignLeft = useCallback(() => {
+    const u = alignLeft(elementsForAlignment);
+    if (u.length) batchUpdateGeometry(u);
+  }, [elementsForAlignment, batchUpdateGeometry]);
+  const handleAlignRight = useCallback(() => {
+    const u = alignRight(elementsForAlignment);
+    if (u.length) batchUpdateGeometry(u);
+  }, [elementsForAlignment, batchUpdateGeometry]);
+  const handleAlignTop = useCallback(() => {
+    const u = alignTop(elementsForAlignment);
+    if (u.length) batchUpdateGeometry(u);
+  }, [elementsForAlignment, batchUpdateGeometry]);
+  const handleAlignBottom = useCallback(() => {
+    const u = alignBottom(elementsForAlignment);
+    if (u.length) batchUpdateGeometry(u);
+  }, [elementsForAlignment, batchUpdateGeometry]);
+  const handleAlignCenterH = useCallback(() => {
+    const u = alignCenterH(elementsForAlignment);
+    if (u.length) batchUpdateGeometry(u);
+  }, [elementsForAlignment, batchUpdateGeometry]);
+  const handleAlignCenterV = useCallback(() => {
+    const u = alignCenterV(elementsForAlignment);
+    if (u.length) batchUpdateGeometry(u);
+  }, [elementsForAlignment, batchUpdateGeometry]);
+  const handleDistributeH = useCallback(() => {
+    const u = distributeH(elementsForAlignment);
+    if (u.length) batchUpdateGeometry(u);
+  }, [elementsForAlignment, batchUpdateGeometry]);
+  const handleDistributeV = useCallback(() => {
+    const u = distributeV(elementsForAlignment);
+    if (u.length) batchUpdateGeometry(u);
+  }, [elementsForAlignment, batchUpdateGeometry]);
 
   // Ctrl+G / Ctrl+Shift+G group shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).matches("input, textarea, [contenteditable]")) return;
+      if (
+        (e.target as HTMLElement).matches("input, textarea, [contenteditable]")
+      )
+        return;
       if (!(e.metaKey || e.ctrlKey) || e.key !== "g") return;
       e.preventDefault();
       if (e.shiftKey) {
         // Ungroup: all selected elements must share the same groupId
         const ids = [...selectedIds];
-        const groupId = data.elements.find((el) => el.id === ids[0])?.properties.groupId;
+        const groupId = data.elements.find((el) => el.id === ids[0])?.properties
+          .groupId;
         if (
           groupId &&
-          ids.every((id) => data.elements.find((el) => el.id === id)?.properties.groupId === groupId)
+          ids.every(
+            (id) =>
+              data.elements.find((el) => el.id === id)?.properties.groupId ===
+              groupId,
+          )
         ) {
           dissolveGroup(groupId);
           setActiveGroupId(null);
@@ -962,7 +1072,10 @@ export function MapEditor({
         // Group: 2+ elements selected, none already in a group
         if (
           selectedIds.size >= 2 &&
-          [...selectedIds].every((id) => !data.elements.find((el) => el.id === id)?.properties.groupId)
+          [...selectedIds].every(
+            (id) =>
+              !data.elements.find((el) => el.id === id)?.properties.groupId,
+          )
         ) {
           createGroup([...selectedIds]);
         }
@@ -1553,19 +1666,57 @@ export function MapEditor({
                       : { optionsBar: [], propertiesPanel: [], contextMenu: [] }
               }
               onDefaultsChange={handleDefaultsChange}
-              onGroup={canGroupSelection ? () => createGroup([...selectedIds]) : undefined}
-              onUngroup={optionsBarGroupId ? () => { dissolveGroup(optionsBarGroupId); setActiveGroupId(null); } : undefined}
-              onEnterGroup={optionsBarGroupId ? () => { setActiveGroupId(optionsBarGroupId); selectOne([...selectedIds][0]); } : undefined}
-              onExitGroup={activeGroupId ? () => setActiveGroupId(null) : undefined}
-              onAlignLeft={alignmentUnitCount >= 2 ? handleAlignLeft : undefined}
-              onAlignCenterH={alignmentUnitCount >= 2 ? handleAlignCenterH : undefined}
-              onAlignRight={alignmentUnitCount >= 2 ? handleAlignRight : undefined}
+              onGroup={
+                canGroupSelection
+                  ? () => createGroup([...selectedIds])
+                  : undefined
+              }
+              onUngroup={
+                optionsBarGroupId
+                  ? () => {
+                      dissolveGroup(optionsBarGroupId);
+                      setActiveGroupId(null);
+                    }
+                  : undefined
+              }
+              onEnterGroup={
+                optionsBarGroupId
+                  ? () => {
+                      setActiveGroupId(optionsBarGroupId);
+                      selectOne([...selectedIds][0]);
+                    }
+                  : undefined
+              }
+              onExitGroup={
+                activeGroupId ? () => setActiveGroupId(null) : undefined
+              }
+              onAlignLeft={
+                alignmentUnitCount >= 2 ? handleAlignLeft : undefined
+              }
+              onAlignCenterH={
+                alignmentUnitCount >= 2 ? handleAlignCenterH : undefined
+              }
+              onAlignRight={
+                alignmentUnitCount >= 2 ? handleAlignRight : undefined
+              }
               onAlignTop={alignmentUnitCount >= 2 ? handleAlignTop : undefined}
-              onAlignCenterV={alignmentUnitCount >= 2 ? handleAlignCenterV : undefined}
-              onAlignBottom={alignmentUnitCount >= 2 ? handleAlignBottom : undefined}
-              onDistributeH={alignmentUnitCount >= 3 ? handleDistributeH : undefined}
-              onDistributeV={alignmentUnitCount >= 3 ? handleDistributeV : undefined}
-              onArrangeAsGrid={alignmentUnitCount >= 2 ? () => setShowArrangeGridDialog(true) : undefined}
+              onAlignCenterV={
+                alignmentUnitCount >= 2 ? handleAlignCenterV : undefined
+              }
+              onAlignBottom={
+                alignmentUnitCount >= 2 ? handleAlignBottom : undefined
+              }
+              onDistributeH={
+                alignmentUnitCount >= 3 ? handleDistributeH : undefined
+              }
+              onDistributeV={
+                alignmentUnitCount >= 3 ? handleDistributeV : undefined
+              }
+              onArrangeAsGrid={
+                alignmentUnitCount >= 2
+                  ? () => setShowArrangeGridDialog(true)
+                  : undefined
+              }
             />
           )}
           <div className="flex flex-1 overflow-hidden">
@@ -1648,7 +1799,9 @@ export function MapEditor({
                     onClick={handleLocateOverlapping}
                     className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-50 border border-red-300 text-red-700 text-sm px-3 py-1.5 rounded-full shadow-sm z-10 whitespace-nowrap hover:bg-red-100 cursor-pointer"
                   >
-                    {overlappingElementIds.size} element{overlappingElementIds.size !== 1 ? "s" : ""} overlapping — click to locate
+                    {overlappingElementIds.size} element
+                    {overlappingElementIds.size !== 1 ? "s" : ""} overlapping —
+                    click to locate
                   </button>
                 )}
 
@@ -1730,7 +1883,7 @@ export function MapEditor({
                 data.backgroundImage &&
                 setBackgroundImage({ ...data.backgroundImage, opacity })
               }
-              onRemoveBackground={() => setBackgroundImage(undefined)}
+              onRemoveBackground={handleRemoveBackground}
               onUploadBackground={() => setShowBgDialog(true)}
               onBackgroundColorChange={setBackgroundColor}
             />
@@ -1778,7 +1931,12 @@ export function MapEditor({
         <ArrangeGridDialog
           elementCount={alignmentUnitCount}
           onConfirm={(cols, gapX, gapY) => {
-            const updates = arrangeAsGrid(elementsForAlignment, cols, gapX, gapY);
+            const updates = arrangeAsGrid(
+              elementsForAlignment,
+              cols,
+              gapX,
+              gapY,
+            );
             if (updates.length) batchUpdateGeometry(updates);
           }}
           onClose={() => setShowArrangeGridDialog(false)}
