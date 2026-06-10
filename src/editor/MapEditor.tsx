@@ -1744,6 +1744,7 @@ export function MapEditor({
         <BackgroundImageDialog
           canvasWidth={data.dimensions.width}
           canvasHeight={data.dimensions.height}
+          onUpload={onUploadBackgroundImage}
           onConfirm={handleBackgroundImage}
           onClose={() => setShowBgDialog(false)}
         />
