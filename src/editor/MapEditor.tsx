@@ -87,24 +87,15 @@ interface MapEditorProps {
   meetingRooms?: MeetingRoom[];
   onSave?: (data: FloorPlanData) => Promise<void>;
   onDirtyChange?: (isDirty: boolean) => void;
-  /**
-   * Delegate background-image upload to the host. When provided, the dialog
-   * sends the raw File instead of inlining a data URL, and stores the hosted
-   * URL the host returns. `width`/`height` may be null (e.g. dimension-less
-   * SVGs); the editor measures the returned image client-side in that case.
-   * When omitted, the editor falls back to the legacy inline data-URL flow.
-   */
   onUploadBackgroundImage?: (file: File) => Promise<{
     url: string;
     width: number | null;
     height: number | null;
   }>;
-  /**
-   * Notify the host that the background was removed. Fire-and-forget from the
-   * editor's perspective: state is cleared regardless, and a rejection does
-   * not restore the image (the host surfaces its own errors).
-   */
   onRemoveBackgroundImage?: () => Promise<void>;
+  onEditProperties?: () => void;
+  name?: string;
+  onNameChange?: (name: string) => void;
   debug?: boolean;
   persist?: boolean;
 }
@@ -118,6 +109,9 @@ export function MapEditor({
   onDirtyChange,
   onUploadBackgroundImage,
   onRemoveBackgroundImage,
+  onEditProperties,
+  name: controlledName,
+  onNameChange,
   debug: debugProp,
   persist,
 }: MapEditorProps) {
@@ -1452,6 +1446,15 @@ export function MapEditor({
         onHelpClick={() => setShowHelp(true)}
         onLegendClick={() => setShowLegendDialog(true)}
         fileMenuItems={[
+          ...(onEditProperties
+            ? [
+                {
+                  label: "Map Properties…",
+                  onClick: onEditProperties,
+                },
+                { type: "divider" as const },
+              ]
+            : []),
           ...(onSave
             ? [
                 {
@@ -1621,8 +1624,11 @@ export function MapEditor({
           onPathingToolChange={setActivePathingTool}
           editorMode={editorMode}
           onEditorModeChange={setEditorMode}
-          mapName={data.name}
-          onMapNameChange={setMapName}
+          mapName={controlledName ?? data.name}
+          onMapNameChange={onNameChange ?? setMapName}
+          nameEditable={
+            controlledName === undefined || onNameChange !== undefined
+          }
           isDirty={isDirty}
           placementRecords={placementRecords}
           onAutoArrange={handleAutoArrange}

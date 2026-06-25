@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Legend, LegendEntry } from "../../../types";
 import { Dialog, Button, TextInput, ColorSwatch } from "../ui";
 import {
@@ -22,10 +22,14 @@ export function LegendDialog({ legend, onSave, onClose }: LegendDialogProps) {
     entries: legend.entries.map((e) => ({ ...e })),
   }));
 
+  const initialSnapshot = useRef(JSON.stringify(legend));
+
   const updateEntry = (id: string, updates: Partial<LegendEntry>) => {
     setLocal((prev) => ({
       ...prev,
-      entries: prev.entries.map((e) => (e.id === id ? { ...e, ...updates } : e)),
+      entries: prev.entries.map((e) =>
+        e.id === id ? { ...e, ...updates } : e,
+      ),
     }));
   };
 
@@ -59,7 +63,9 @@ export function LegendDialog({ legend, onSave, onClose }: LegendDialogProps) {
   };
 
   const handleDone = () => {
-    onSave(local);
+    if (JSON.stringify(local) !== initialSnapshot.current) {
+      onSave(local);
+    }
     onClose();
   };
 
@@ -81,7 +87,9 @@ export function LegendDialog({ legend, onSave, onClose }: LegendDialogProps) {
           <input
             type="checkbox"
             checked={local.visible}
-            onChange={(e) => setLocal((prev) => ({ ...prev, visible: e.target.checked }))}
+            onChange={(e) =>
+              setLocal((prev) => ({ ...prev, visible: e.target.checked }))
+            }
             className="cursor-pointer"
           />
           <span className="text-xs text-gray-700">Show legend on map</span>
@@ -100,16 +108,24 @@ export function LegendDialog({ legend, onSave, onClose }: LegendDialogProps) {
                 <div className="flex-1">
                   <TextInput
                     value={entry.label}
-                    onChange={(e) => updateEntry(entry.id, { label: e.target.value })}
+                    onChange={(e) =>
+                      updateEntry(entry.id, { label: e.target.value })
+                    }
                     placeholder="Label…"
                   />
                 </div>
                 <button
                   className="p-1 rounded text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                  onClick={() => updateEntry(entry.id, { visible: !entry.visible })}
+                  onClick={() =>
+                    updateEntry(entry.id, { visible: !entry.visible })
+                  }
                   title={entry.visible ? "Hide entry" : "Show entry"}
                 >
-                  {entry.visible ? <PiEye size={15} /> : <PiEyeSlash size={15} className="text-red-400" />}
+                  {entry.visible ? (
+                    <PiEye size={15} />
+                  ) : (
+                    <PiEyeSlash size={15} className="text-red-400" />
+                  )}
                 </button>
                 <button
                   className="p-1 rounded text-gray-400 hover:text-gray-600 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-default"
@@ -140,7 +156,9 @@ export function LegendDialog({ legend, onSave, onClose }: LegendDialogProps) {
         )}
 
         {local.entries.length === 0 && (
-          <p className="text-xs text-gray-400 text-center py-2">No entries yet.</p>
+          <p className="text-xs text-gray-400 text-center py-2">
+            No entries yet.
+          </p>
         )}
 
         {/* Add entry */}
