@@ -83,12 +83,14 @@ const pathingToolDefs: ToolDef<PathingTool>[] = [
 function SidebarHeader({
   mapName,
   onMapNameChange,
+  nameEditable = true,
   editorMode,
   onEditorModeChange,
   isDirty,
 }: {
   mapName: string;
   onMapNameChange: (name: string) => void;
+  nameEditable?: boolean;
   editorMode: EditorMode;
   onEditorModeChange: (mode: EditorMode) => void;
   isDirty?: boolean;
@@ -120,7 +122,11 @@ function SidebarHeader({
       {isDirty && (
         <span className="shrink-0 text-red-500 font-bold text-sm leading-none" title="Unsaved changes">*</span>
       )}
-      {editing ? (
+      {!nameEditable ? (
+        <span className="flex-1 text-base font-semibold text-gray-800 truncate">
+          {mapName}
+        </span>
+      ) : editing ? (
         <input
           ref={inputRef}
           value={draft}
@@ -220,6 +226,8 @@ interface ToolSidebarProps {
   onEditorModeChange: (mode: EditorMode) => void;
   mapName: string;
   onMapNameChange: (name: string) => void;
+  /** When false, the map name is shown read-only (no inline rename). Default true. */
+  nameEditable?: boolean;
   isDirty?: boolean;
   placementRecords: PlacementRecords;
   onAutoArrange: (type: "booth" | "session_area" | "meeting_room", records: AutoArrangeRecord[]) => void;
@@ -237,6 +245,7 @@ export function ToolSidebar({
   onEditorModeChange,
   mapName,
   onMapNameChange,
+  nameEditable = true,
   isDirty,
   placementRecords,
   onAutoArrange,
@@ -277,6 +286,7 @@ export function ToolSidebar({
       <SidebarHeader
         mapName={mapName}
         onMapNameChange={onMapNameChange}
+        nameEditable={nameEditable}
         editorMode={editorMode}
         onEditorModeChange={onEditorModeChange}
         isDirty={isDirty}
