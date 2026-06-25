@@ -105,6 +105,12 @@ interface MapEditorProps {
    * not restore the image (the host surfaces its own errors).
    */
   onRemoveBackgroundImage?: () => Promise<void>;
+  /**
+   * Open the host's map-properties UI. When provided, a "Map Properties…" item
+   * appears in the File menu. The package stays domain-agnostic: it owns no
+   * knowledge of the map's metadata fields — the host renders and persists them.
+   */
+  onEditProperties?: () => void;
   debug?: boolean;
   persist?: boolean;
 }
@@ -118,6 +124,7 @@ export function MapEditor({
   onDirtyChange,
   onUploadBackgroundImage,
   onRemoveBackgroundImage,
+  onEditProperties,
   debug: debugProp,
   persist,
 }: MapEditorProps) {
@@ -1452,6 +1459,15 @@ export function MapEditor({
         onHelpClick={() => setShowHelp(true)}
         onLegendClick={() => setShowLegendDialog(true)}
         fileMenuItems={[
+          ...(onEditProperties
+            ? [
+                {
+                  label: "Map Properties…",
+                  onClick: onEditProperties,
+                },
+                { type: "divider" as const },
+              ]
+            : []),
           ...(onSave
             ? [
                 {
