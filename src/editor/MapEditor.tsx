@@ -73,6 +73,8 @@ import {
   ELEMENT_TYPE_TO_LAYER,
   DEFAULT_TYPE_STYLES,
 } from "../types";
+import { resolveFeatures } from "../tiers";
+import type { Tier, FeatureKey, FeatureOverride } from "../tiers";
 
 const INITIAL_DEFAULTS: DrawingDefaults = {
   fill: "#94a3b8",
@@ -98,6 +100,10 @@ interface MapEditorProps {
   onNameChange?: (name: string) => void;
   debug?: boolean;
   persist?: boolean;
+  /** Usage-tier preset controlling which features are enabled. Defaults to "premium". */
+  tier?: Tier;
+  /** Per-feature overrides applied on top of the tier preset. */
+  features?: Partial<Record<FeatureKey, FeatureOverride>>;
 }
 
 export function MapEditor({
@@ -114,8 +120,14 @@ export function MapEditor({
   onNameChange,
   debug: debugProp,
   persist,
+  tier,
+  features,
 }: MapEditorProps) {
   const debug = debugProp || import.meta.env.DEV;
+
+  // Resolve usage-tier capabilities once. Tri-state per feature:
+  // "enabled" | "locked" (disabled + trophy) | "hidden" (not rendered).
+  const featureMap = useMemo(() => resolveFeatures(tier, features), [tier, features]);
 
   const {
     data,
@@ -242,6 +254,8 @@ export function MapEditor({
 
   const setActiveLayerId = useCallback(
     (id: LayerId) => {
+      // Wayfinding (pathing layer) is gated by the usage tier.
+      if (id === "pathing" && featureMap.wayfinding !== "enabled") return;
       _setActiveLayerId(id);
       setSelectedIds(new Set());
       if (id === "pathing") {
@@ -249,7 +263,16 @@ export function MapEditor({
         setActivePathingTool("select");
       }
     },
-    [initWalkableGrid],
+    [initWalkableGrid, featureMap.wayfinding],
+  );
+
+  // Placement mode (objects) is gated by the usage tier.
+  const handleEditorModeChange = useCallback(
+    (mode: EditorMode) => {
+      if (mode === "placement" && featureMap.objects !== "enabled") return;
+      setEditorMode(mode);
+    },
+    [featureMap.objects],
   );
 
   const toggleLayerVisibility = useCallback((id: LayerId) => {
@@ -516,6 +539,8 @@ export function MapEditor({
     onRedo: redo,
     isPathingMode,
     setPathingTool: setActivePathingTool,
+    // All registry tools are drawing tools, gated by the drawingTools feature.
+    isToolEnabled: () => featureMap.drawingTools === "enabled",
   });
 
   // Options bar: show selected element's colors or drawing defaults
@@ -922,12 +947,14 @@ export function MapEditor({
 
   const handleToolChange = useCallback(
     (tool: ActiveTool) => {
+      // select is always available; all other registry tools are drawing tools.
+      if (tool !== "select" && featureMap.drawingTools !== "enabled") return;
       setActiveTool(tool);
       if (tool !== "select") {
         selectNone();
       }
     },
-    [selectNone],
+    [selectNone, featureMap.drawingTools],
   );
 
   // Canvas selection handler: supports shift+click and group-aware routing
@@ -1607,10 +1634,18 @@ export function MapEditor({
             label: "Canvas Size...",
             onClick: () => setShowResizeDialog(true),
           },
-          {
-            label: "Set Scale...",
-            onClick: handleStartCalibration,
-          },
+          // Scale calibration is gated by the usage tier: omitted when hidden,
+          // disabled + trophy when locked behind a higher tier.
+          ...(featureMap.scaleCalibration === "hidden"
+            ? []
+            : [
+                {
+                  label: "Set Scale...",
+                  disabled: featureMap.scaleCalibration === "locked",
+                  premium: featureMap.scaleCalibration === "locked",
+                  onClick: handleStartCalibration,
+                },
+              ]),
         ]}
       />
       <div className="flex flex-1 overflow-hidden">
@@ -1622,8 +1657,10 @@ export function MapEditor({
           isPathingMode={activeLayerId === "pathing"}
           activePathingTool={activePathingTool}
           onPathingToolChange={setActivePathingTool}
-          editorMode={editorMode}
-          onEditorModeChange={setEditorMode}
+          // If the tier locks objects, fall back to design mode so the
+          // placement panel can't linger after a live tier change.
+          editorMode={featureMap.objects === "enabled" ? editorMode : "design"}
+          onEditorModeChange={handleEditorModeChange}
           mapName={controlledName ?? data.name}
           onMapNameChange={onNameChange ?? setMapName}
           nameEditable={
@@ -1632,6 +1669,7 @@ export function MapEditor({
           isDirty={isDirty}
           placementRecords={placementRecords}
           onAutoArrange={handleAutoArrange}
+          features={featureMap}
         />
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           {isPathingMode ? (
@@ -1796,6 +1834,7 @@ export function MapEditor({
                   onSetActiveLayer={setActiveLayerId}
                   onToggleVisibility={toggleLayerVisibility}
                   topOffset={showRulers ? 26 : 8}
+                  features={featureMap}
                 />
                 <LegendCanvasOverlay legend={data.legend} />
 
@@ -1890,7 +1929,11 @@ export function MapEditor({
                 setBackgroundImage({ ...data.backgroundImage, opacity })
               }
               onRemoveBackground={handleRemoveBackground}
-              onUploadBackground={() => setShowBgDialog(true)}
+              onUploadBackground={() => {
+                // Background image is gated by the usage tier.
+                if (featureMap.backgroundImage !== "enabled") return;
+                setShowBgDialog(true);
+              }}
               onBackgroundColorChange={setBackgroundColor}
             />
           </div>

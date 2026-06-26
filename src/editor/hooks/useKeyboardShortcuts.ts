@@ -22,6 +22,8 @@ interface KeyboardShortcutActions {
   onRedo: () => void;
   isPathingMode?: boolean;
   setPathingTool?: (tool: PathingTool) => void;
+  /** Returns false for tools disabled/hidden by the usage tier. Defaults to allow-all. */
+  isToolEnabled?: (toolId: string) => boolean;
 }
 
 export function useKeyboardShortcuts({
@@ -36,6 +38,7 @@ export function useKeyboardShortcuts({
   onRedo,
   isPathingMode,
   setPathingTool,
+  isToolEnabled,
 }: KeyboardShortcutActions) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -120,12 +123,12 @@ export function useKeyboardShortcuts({
 
       // Registry-derived shortcuts
       const toolId = toolShortcuts.get(key);
-      if (toolId) {
+      if (toolId && (!isToolEnabled || isToolEnabled(toolId))) {
         setActiveTool(toolId as ActiveTool);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setActiveTool, onDeselect, onDelete, onCopy, onPaste, onDuplicate, onSelectAll, onUndo, onRedo, isPathingMode, setPathingTool]);
+  }, [setActiveTool, onDeselect, onDelete, onCopy, onPaste, onDuplicate, onSelectAll, onUndo, onRedo, isPathingMode, setPathingTool, isToolEnabled]);
 }

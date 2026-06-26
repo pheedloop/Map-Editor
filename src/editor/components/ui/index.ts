@@ -16,3 +16,4 @@ export { TextArea } from "./TextArea";
 export { TextInput } from "./TextInput";
 export { DropdownMenu } from "./DropdownMenu";
 export type { MenuEntry, MenuItemConfig, MenuDivider } from "./DropdownMenu";
+export { TrophyIcon } from "./TrophyIcon";

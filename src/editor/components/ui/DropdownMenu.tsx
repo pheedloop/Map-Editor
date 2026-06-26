@@ -1,10 +1,13 @@
 import { useRef, useEffect } from "react";
+import { TrophyIcon } from "./TrophyIcon";
 
 export interface MenuItemConfig {
   label: string;
   shortcut?: string;
   disabled?: boolean;
   danger?: boolean;
+  /** Show the premium trophy badge (a usage-tier locked feature). */
+  premium?: boolean;
   onClick?: () => void;
 }
 
@@ -18,11 +21,12 @@ function isMenuDivider(entry: MenuEntry): entry is MenuDivider {
   return "type" in entry && entry.type === "divider";
 }
 
-function MenuItem({ label, shortcut, disabled, danger, onClick }: MenuItemConfig) {
+function MenuItem({ label, shortcut, disabled, danger, premium, onClick }: MenuItemConfig) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      title={disabled && premium ? "Premium feature" : undefined}
       className={`flex items-center justify-between w-full px-3 py-1.5 text-xs transition-colors ${
         disabled
           ? "text-gray-300 cursor-default"
@@ -32,10 +36,16 @@ function MenuItem({ label, shortcut, disabled, danger, onClick }: MenuItemConfig
       }`}
     >
       <span>{label}</span>
-      {shortcut && (
-        <span className={`ml-6 ${disabled ? "text-gray-300" : "text-gray-400"}`}>
-          {shortcut}
+      {premium ? (
+        <span className="ml-6 flex items-center">
+          <TrophyIcon size={12} />
         </span>
+      ) : (
+        shortcut && (
+          <span className={`ml-6 ${disabled ? "text-gray-300" : "text-gray-400"}`}>
+            {shortcut}
+          </span>
+        )
       )}
     </button>
   );
