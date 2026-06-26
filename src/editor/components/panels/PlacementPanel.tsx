@@ -256,7 +256,6 @@ interface SectionProps extends SectionConfig {
   statusFilter: StatusFilter;
   onStatusFilterChange: (f: StatusFilter) => void;
   onAutoArrange?: () => void;
-  stub?: boolean;
   children?: React.ReactNode;
 }
 
@@ -276,7 +275,6 @@ function Section({
   statusFilter,
   onStatusFilterChange,
   onAutoArrange,
-  stub = false,
   children,
 }: SectionProps) {
   const total = placed + unplaced;
@@ -306,27 +304,25 @@ function Section({
           <span className="block text-sm font-semibold text-gray-800 truncate">
             {title}
           </span>
-          {!stub && (
-            <span className="block text-xs text-gray-400 tabular-nums">
-              Placed: {placed}&nbsp;&nbsp;|&nbsp;&nbsp;Unplaced: {unplaced}
-            </span>
-          )}
+          <span className="block text-xs text-gray-400 tabular-nums">
+            Placed: {placed}&nbsp;&nbsp;|&nbsp;&nbsp;Unplaced: {unplaced}
+          </span>
         </span>
         <span
           className={[
             "shrink-0 transition-colors",
-            !stub && totalUnplaced > 0 && onAutoArrange
+            totalUnplaced > 0 && onAutoArrange
               ? "text-amber-400 hover:text-amber-500 cursor-pointer"
               : "text-gray-200 cursor-default",
           ].join(" ")}
           title={
-            !stub && totalUnplaced > 0
+            totalUnplaced > 0
               ? `Auto-place ${totalUnplaced} unplaced`
               : "No unplaced items"
           }
           onClick={(e) => {
             e.stopPropagation();
-            if (!stub && totalUnplaced > 0) onAutoArrange?.();
+            if (totalUnplaced > 0) onAutoArrange?.();
           }}
         >
           <PiSparkle size={14} />
@@ -339,11 +335,7 @@ function Section({
       {/* Body */}
       {isOpen && (
         <SectionShapeContext.Provider value={defaultShape}>
-          {stub ? (
-            <p className="px-3 py-2.5 text-xs text-gray-400 italic">
-              Coming soon
-            </p>
-          ) : total === 0 ? (
+          {total === 0 ? (
             <p className="px-3 py-2.5 text-xs text-gray-400 italic">
               No records found
             </p>
@@ -488,7 +480,7 @@ function MeetingRoomRow({ record, isPlaced }: PlacedRecord<MeetingRoom>) {
 // Main component
 // ---------------------------------------------------------------------------
 
-type SectionId = "booths" | "sessions" | "meetingRooms" | "tables";
+type SectionId = "booths" | "sessions" | "meetingRooms";
 
 interface PlacementPanelProps {
   records: PlacementRecords;
@@ -510,14 +502,13 @@ export function PlacementPanel({
   const [openSection, setOpenSection] = useState<SectionId | null>(null);
   const [sectionShapes, setSectionShapes] = useState<
     Record<SectionId, "rect" | "ellipse">
-  >({ booths: "rect", sessions: "rect", meetingRooms: "rect", tables: "rect" });
+  >({ booths: "rect", sessions: "rect", meetingRooms: "rect" });
   const [sectionFilters, setSectionFilters] = useState<
     Record<SectionId, SectionFilter>
   >({
     booths: emptyFilter,
     sessions: emptyFilter,
     meetingRooms: emptyFilter,
-    tables: emptyFilter,
   });
 
   const updateFilter = (id: SectionId, patch: Partial<SectionFilter>) =>
@@ -658,33 +649,6 @@ export function PlacementPanel({
             <MeetingRoomRow key={r.record.id} {...r} />
           ))}
         </Section>
-
-        <Section
-          title="Tables"
-          placed={0}
-          unplaced={0}
-          totalUnplaced={0}
-          iconShape="rect"
-          iconColor="#6b7280"
-          isOpen={openSection === "tables"}
-          onToggle={() => toggle("tables")}
-          defaultShape={sectionShapes.tables}
-          onDefaultShapeChange={setShape("tables")}
-          query=""
-          onQueryChange={() => {}}
-          statusFilter="all"
-          onStatusFilterChange={() => {}}
-          stub
-        />
-      </div>
-
-      <div className="px-3 py-2.5 border-t border-gray-100 shrink-0 text-center">
-        <button
-          type="button"
-          className="text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors"
-        >
-          Manage Seat Plan →
-        </button>
       </div>
     </div>
   );
