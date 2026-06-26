@@ -12,16 +12,26 @@ import { MapSheet } from "./components/MapSheet";
 import { BoothPopover } from "./components/BoothPopover";
 import { LocationPopover } from "./components/LocationPopover";
 import { DirectionsPanel } from "./components/DirectionsPanel";
+import { resolveFeatures } from "../tiers";
+import type { Tier, FeatureKey, FeatureOverride } from "../tiers";
 
 interface MapViewerProps {
   data: FloorPlanData;
   exhibitors: Exhibitor[];
   mode?: ViewerMode;
+  /** Usage-tier preset controlling which features are enabled. Defaults to "premium". */
+  tier?: Tier;
+  /** Per-feature overrides applied on top of the tier preset. */
+  features?: Partial<Record<FeatureKey, FeatureOverride>>;
 }
 
 const MOBILE_BREAKPOINT = 640;
 
-export function MapViewer({ data, exhibitors, mode = "attendee" }: MapViewerProps) {
+export function MapViewer({ data, exhibitors, mode = "attendee", tier, features }: MapViewerProps) {
+  // Wayfinding (Directions) is gated by the usage tier. The viewer hides the
+  // feature entirely when it is not enabled (no disabled/trophy state here).
+  const featureMap = useMemo(() => resolveFeatures(tier, features), [tier, features]);
+  const wayfindingEnabled = featureMap.wayfinding === "enabled";
   const containerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [selectedItem, setSelectedItem] = useState<HoveredItem | null>(null);
@@ -117,7 +127,8 @@ export function MapViewer({ data, exhibitors, mode = "attendee" }: MapViewerProp
     [directions]
   );
 
-  const showDirectionsButton = mode === "attendee" && directions.hasGrid && !directions.active;
+  const showDirectionsButton =
+    wayfindingEnabled && mode === "attendee" && directions.hasGrid && !directions.active;
 
   return (
     <div ref={containerRef} className="pl-map-editor flex flex-col h-full relative">
@@ -206,7 +217,7 @@ export function MapViewer({ data, exhibitors, mode = "attendee" }: MapViewerProp
             y={popover.y}
             onClose={handlePopoverClose}
             onGetDirections={
-              mode === "attendee" && directions.hasGrid
+              wayfindingEnabled && mode === "attendee" && directions.hasGrid
                 ? () => handleGetDirections(popover.item.elementId)
                 : undefined
             }
@@ -220,7 +231,7 @@ export function MapViewer({ data, exhibitors, mode = "attendee" }: MapViewerProp
             y={popover.y}
             onClose={handlePopoverClose}
             onGetDirections={
-              mode === "attendee" && directions.hasGrid
+              wayfindingEnabled && mode === "attendee" && directions.hasGrid
                 ? () => handleGetDirections(popover.item.elementId)
                 : undefined
             }

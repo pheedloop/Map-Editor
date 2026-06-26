@@ -10,7 +10,9 @@ import {
 } from "react-icons/pi";
 import type { ActiveTool, EditorMode, PathingTool } from "../../types";
 import { TOOL_REGISTRY } from "../../tools/registry";
-import { IconButton } from "../ui";
+import type { FeatureMap } from "../../../tiers";
+import { showTrophy } from "../../../tiers";
+import { IconButton, TrophyIcon } from "../ui";
 import { IconPicker } from "./IconPicker";
 import { getIconEntry } from "../../utils/iconRegistry";
 import type { PlacementRecords } from "../../hooks/usePlacementRecords";
@@ -87,6 +89,7 @@ function SidebarHeader({
   editorMode,
   onEditorModeChange,
   isDirty,
+  objectsState,
 }: {
   mapName: string;
   onMapNameChange: (name: string) => void;
@@ -94,6 +97,8 @@ function SidebarHeader({
   editorMode: EditorMode;
   onEditorModeChange: (mode: EditorMode) => void;
   isDirty?: boolean;
+  /** Capability of the "objects" feature, gating the Placement Mode toggle. */
+  objectsState: FeatureMap["objects"];
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(mapName);
@@ -154,14 +159,26 @@ function SidebarHeader({
           {mapName}
         </button>
       )}
-      <IconButton
-        size="sm"
-        active={editorMode === "placement"}
-        onClick={() => onEditorModeChange("placement")}
-        title="Placement Mode"
-      >
-        <PiStorefront size={16} />
-      </IconButton>
+      {objectsState !== "hidden" &&
+        (objectsState === "locked" ? (
+          <span className="relative inline-flex shrink-0" title="Premium feature">
+            <IconButton size="sm" disabled>
+              <PiStorefront size={16} />
+            </IconButton>
+            <span className="absolute -top-0.5 -right-0.5 pointer-events-none">
+              <TrophyIcon size={12} />
+            </span>
+          </span>
+        ) : (
+          <IconButton
+            size="sm"
+            active={editorMode === "placement"}
+            onClick={() => onEditorModeChange("placement")}
+            title="Placement Mode"
+          >
+            <PiStorefront size={16} />
+          </IconButton>
+        ))}
       <IconButton
         size="sm"
         active={editorMode === "design"}
@@ -178,33 +195,47 @@ function ToolRow<T extends string>({
   tool,
   isActive,
   onClick,
+  disabled = false,
+  locked = false,
 }: {
   tool: ToolDef<T>;
   isActive: boolean;
   onClick: () => void;
+  /** When true, the tool is greyed out and clicks are ignored. */
+  disabled?: boolean;
+  /** When true, show the premium trophy badge (implies disabled styling). */
+  locked?: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={disabled ? "Premium feature" : undefined}
       className={[
         "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors",
-        isActive
-          ? "bg-primary-600 text-white"
-          : "text-gray-600 hover:bg-gray-100 hover:text-gray-800",
+        disabled
+          ? "text-gray-300 cursor-not-allowed"
+          : isActive
+            ? "bg-primary-600 text-white"
+            : "text-gray-600 hover:bg-gray-100 hover:text-gray-800",
       ].join(" ")}
     >
       <span className="shrink-0 flex items-center w-4">{tool.icon}</span>
       <span className="flex-1 text-left">{tool.label}</span>
-      {tool.shortcut && (
-        <span
-          className={[
-            "text-xs font-mono",
-            isActive ? "text-primary-200" : "text-gray-400",
-          ].join(" ")}
-        >
-          {tool.shortcut}
-        </span>
+      {locked ? (
+        <TrophyIcon size={14} />
+      ) : (
+        tool.shortcut && (
+          <span
+            className={[
+              "text-xs font-mono",
+              isActive ? "text-primary-200" : "text-gray-400",
+            ].join(" ")}
+          >
+            {tool.shortcut}
+          </span>
+        )
       )}
     </button>
   );
@@ -231,6 +262,8 @@ interface ToolSidebarProps {
   isDirty?: boolean;
   placementRecords: PlacementRecords;
   onAutoArrange: (type: "booth" | "session_area" | "meeting_room", records: AutoArrangeRecord[]) => void;
+  /** Resolved usage-tier capabilities. */
+  features: FeatureMap;
 }
 
 export function ToolSidebar({
@@ -249,6 +282,7 @@ export function ToolSidebar({
   isDirty,
   placementRecords,
   onAutoArrange,
+  features,
 }: ToolSidebarProps) {
   const iconRowRef = useRef<HTMLDivElement>(null);
   const showIconPicker = activeTool === "icon" && !!onIconSelect;
@@ -290,6 +324,7 @@ export function ToolSidebar({
         editorMode={editorMode}
         onEditorModeChange={onEditorModeChange}
         isDirty={isDirty}
+        objectsState={features.objects}
       />
 
       {/* Tab content */}
@@ -300,27 +335,30 @@ export function ToolSidebar({
             isActive={activeTool === "select"}
             onClick={() => onToolChange("select")}
           />
-          {toolDefs.map((tool) => {
-            const displayTool =
-              tool.id === "icon" && activeIconName
-                ? (() => {
-                    const entry = getIconEntry(activeIconName);
-                    if (!entry) return tool;
-                    const ActiveIcon = entry.component;
-                    return { ...tool, icon: <ActiveIcon size={16} /> };
-                  })()
-                : tool;
+          {features.drawingTools !== "hidden" &&
+            toolDefs.map((tool) => {
+              const displayTool =
+                tool.id === "icon" && activeIconName
+                  ? (() => {
+                      const entry = getIconEntry(activeIconName);
+                      if (!entry) return tool;
+                      const ActiveIcon = entry.component;
+                      return { ...tool, icon: <ActiveIcon size={16} /> };
+                    })()
+                  : tool;
 
-            return (
-              <div key={tool.id} ref={tool.id === "icon" ? iconRowRef : null}>
-                <ToolRow
-                  tool={displayTool}
-                  isActive={activeTool === tool.id}
-                  onClick={() => onToolChange(tool.id)}
-                />
-              </div>
-            );
-          })}
+              return (
+                <div key={tool.id} ref={tool.id === "icon" ? iconRowRef : null}>
+                  <ToolRow
+                    tool={displayTool}
+                    isActive={activeTool === tool.id}
+                    onClick={() => onToolChange(tool.id)}
+                    disabled={features.drawingTools === "locked"}
+                    locked={showTrophy("drawingTools", features)}
+                  />
+                </div>
+              );
+            })}
         </div>
       ) : (
         <div className="flex-1 overflow-hidden flex flex-col">

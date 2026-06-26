@@ -5,7 +5,7 @@ import {
   PiUser,
   PiStorefront,
 } from "react-icons/pi";
-import { MapEditor } from "./editor";
+import { MapEditor, type Tier } from "./editor";
 import { MapViewer } from "./viewer";
 import { Roadmap } from "./roadmap/Roadmap";
 import { KnownIssues } from "./roadmap/KnownIssues";
@@ -41,13 +41,20 @@ function loadViewerData(): FloorPlanData | null {
 function ViewerRoute({
   viewport,
   mode,
+  tier,
 }: {
   viewport: Viewport;
   mode: ViewerMode;
+  tier: Tier;
 }) {
   const data = loadViewerData() ?? exhibitionHallMap;
   const viewer = (
-    <MapViewer data={data} exhibitors={conferenceExpoExhibitors} mode={mode} />
+    <MapViewer
+      data={data}
+      exhibitors={conferenceExpoExhibitors}
+      mode={mode}
+      tier={tier}
+    />
   );
 
   if (viewport === "mobile") {
@@ -70,6 +77,7 @@ function App() {
   const [route, setRoute] = useState<Route>(getRoute);
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [viewerMode, setViewerMode] = useState<ViewerMode>("attendee");
+  const [tier, setTier] = useState<Tier>("premium");
 
   useEffect(() => {
     const onHashChange = () => setRoute(getRoute());
@@ -120,6 +128,27 @@ function App() {
         >
           Issues
         </a>
+
+        {(route === "editor" || route === "viewer") && (
+          <>
+            <div className="w-px h-4 bg-gray-700 mx-1" />
+            <span className="text-gray-500 mr-0.5">Tier:</span>
+            {(["basic", "advanced", "premium"] as Tier[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTier(t)}
+                className={`px-2 py-0.5 rounded capitalize cursor-pointer transition-colors ${
+                  tier === t
+                    ? "bg-white/15 text-white"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+                title={`Set ${t} tier`}
+              >
+                {t}
+              </button>
+            ))}
+          </>
+        )}
 
         {route === "viewer" && (
           <>
@@ -181,12 +210,13 @@ function App() {
             booths={conferenceExpoBooths}
             sessions={sampleSessionLocations}
             meetingRooms={sampleMeetingRooms}
+            tier={tier}
             persist
             debug
           />
         )}
         {route === "viewer" && (
-          <ViewerRoute viewport={viewport} mode={viewerMode} />
+          <ViewerRoute viewport={viewport} mode={viewerMode} tier={tier} />
         )}
         {route === "roadmap" && <Roadmap />}
         {route === "issues" && <KnownIssues />}
