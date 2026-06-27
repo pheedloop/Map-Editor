@@ -51,6 +51,8 @@ export interface SeatOccupant {
   email: string;
   title?: string;
   organization?: string;
+  /** Seat-selection id for this occupant — enables per-occupant unassign. */
+  seatSelectionCode?: number | null;
 }
 
 /**

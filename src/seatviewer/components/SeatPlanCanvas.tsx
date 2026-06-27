@@ -4,7 +4,6 @@ import type { FloorPlanData } from "../../types";
 import { useCanvasControls } from "../../editor/hooks/useCanvasControls";
 import { BackgroundImage } from "../../editor/components/canvas/BackgroundImage";
 import { ViewerElement } from "../../viewer/components/ViewerElement";
-import { ScaleBar } from "../../viewer/components/ScaleBar";
 
 export interface SeatPlanCanvasProps {
   data: FloorPlanData;
@@ -102,7 +101,6 @@ export function SeatPlanCanvas({
           })}
         </Layer>
       </Stage>
-      <ScaleBar dimensions={data.dimensions} scale={scale} />
     </div>
   );
 }
