@@ -41,5 +41,5 @@ export const boothTool: ToolDefinition<DrawingRect | null> = {
   ownsGeometry: ["rect"],
   optionsBar: ["fill", "stroke", "strokeWidth"],
   propertiesPanel: ["name", "width", "height", "rotation", "area"],
-  contextMenu: ["convertToSessionArea", "convertToMeetingRoom", "convertToShape", "delete"],
+  contextMenu: ["convertToObject", "convertToShape", "delete"],
 };

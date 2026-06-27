@@ -40,5 +40,5 @@ export const polygonTool: ToolDefinition<PolygonToolState> = {
   ownsGeometry: ["polygon"],
   optionsBar: ["fill", "stroke", "strokeWidth"],
   propertiesPanel: ["name"],
-  contextMenu: ["convertToBooth", "convertToSessionArea", "convertToMeetingRoom", "delete"],
+  contextMenu: ["convertToObject", "delete"],
 };

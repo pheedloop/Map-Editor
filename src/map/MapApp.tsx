@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   PiDesktop,
   PiDeviceMobile,
   PiUser,
   PiStorefront,
 } from "react-icons/pi";
-import { MapEditor, type Tier } from "../editor";
+import { MapEditor, definePlacementCategory, type Tier } from "../editor";
 import { MapViewer } from "../viewer";
 import { ProductSwitcher } from "../components/ProductSwitcher";
 import { exhibitionHallMap } from "../sample-data/exhibition-hall-map";
@@ -14,7 +14,12 @@ import { conferenceExpoBooths } from "../sample-data/sample-booths";
 import { sampleSessionLocations } from "../sample-data/sample-session-locations";
 import { sampleMeetingRooms } from "../sample-data/sample-meeting-rooms";
 import type { FloorPlanData } from "../types";
-import type { ViewerMode } from "../viewer/types";
+import type {
+  ViewerMode,
+  ExhibitorBooth,
+  SessionLocation,
+  MeetingRoom,
+} from "../viewer/types";
 
 type Mode = "editor" | "viewer";
 type Viewport = "desktop" | "mobile";
@@ -81,6 +86,59 @@ export function MapApp() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  // The three records-backed object categories for the exhibition-map product.
+  const placementCategories = useMemo(
+    () => [
+      definePlacementCategory<ExhibitorBooth>({
+        id: "booths",
+        elementType: "booth",
+        linkKey: "boothSlug",
+        records: conferenceExpoBooths,
+        title: "Booths",
+        iconColor: "#3b82f6",
+        iconShape: "rect",
+        defaultShape: "rect",
+        getRecordId: (r) => r.slug,
+        getPrimaryLabel: (r) => r.code,
+        convertLabel: "Convert to Booth",
+        convertColor: "#3498DB",
+      }),
+      definePlacementCategory<SessionLocation>({
+        id: "sessions",
+        elementType: "session_area",
+        linkKey: "sessionId",
+        records: sampleSessionLocations,
+        title: "Session Locations",
+        iconColor: "#8b5cf6",
+        iconShape: "oval",
+        defaultShape: "rect",
+        getRecordId: (r) => String(r.id),
+        getPrimaryLabel: (r) => r.title,
+        convertLabel: "Convert to Session Location",
+        convertColor: "#27AE60",
+      }),
+      definePlacementCategory<MeetingRoom>({
+        id: "meetingRooms",
+        elementType: "meeting_room",
+        linkKey: "meetingRoomId",
+        records: sampleMeetingRooms,
+        title: "Meeting Rooms",
+        iconColor: "#f59e0b",
+        iconShape: "rect",
+        defaultShape: "rect",
+        getRecordId: (r) => String(r.id),
+        getPrimaryLabel: (r) => r.name,
+        getSecondaryLabel: (r) =>
+          r.capacity != null ? `${r.capacity} cap.` : null,
+        getExtraProps: (r) =>
+          r.capacity != null ? { capacity: r.capacity } : {},
+        convertLabel: "Convert to Meeting Room",
+        convertColor: "#F39C12",
+      }),
+    ],
+    [],
+  );
 
   const modeTab = (m: Mode, label: string) => (
     <a
@@ -177,9 +235,7 @@ export function MapApp() {
         {mode === "editor" && (
           <MapEditor
             initialData={exhibitionHallMap}
-            booths={conferenceExpoBooths}
-            sessions={sampleSessionLocations}
-            meetingRooms={sampleMeetingRooms}
+            placementCategories={placementCategories}
             tier={tier}
             persist
             debug

@@ -63,11 +63,7 @@ import type {
   LayerId,
   LayerDefinition,
 } from "../types";
-import type {
-  ExhibitorBooth,
-  SessionLocation,
-  MeetingRoom,
-} from "../viewer/types";
+import type { PlacementCategory } from "./placement/types";
 import {
   DEFAULT_LAYERS,
   ELEMENT_TYPE_TO_LAYER,
@@ -84,9 +80,8 @@ const INITIAL_DEFAULTS: DrawingDefaults = {
 
 interface MapEditorProps {
   initialData: FloorPlanData;
-  booths?: ExhibitorBooth[];
-  sessions?: SessionLocation[];
-  meetingRooms?: MeetingRoom[];
+  /** Records-backed object categories available for placement (booths, tables, …). */
+  placementCategories?: PlacementCategory[];
   onSave?: (data: FloorPlanData) => Promise<void>;
   onDirtyChange?: (isDirty: boolean) => void;
   onUploadBackgroundImage?: (file: File) => Promise<{
@@ -108,9 +103,7 @@ interface MapEditorProps {
 
 export function MapEditor({
   initialData,
-  booths = [],
-  sessions = [],
-  meetingRooms = [],
+  placementCategories = [],
   onSave,
   onDirtyChange,
   onUploadBackgroundImage,
@@ -171,12 +164,7 @@ export function MapEditor({
   const [activeLayerId, _setActiveLayerId] = useState<LayerId>("content");
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   const [editorMode, setEditorMode] = useState<EditorMode>("design");
-  const placementRecords = usePlacementRecords(
-    data,
-    booths,
-    sessions,
-    meetingRooms,
-  );
+  const placementRecords = usePlacementRecords(data, placementCategories);
 
   // --- Save state ---
   // cleanDataRef holds the data reference at the last save (or initial load).
@@ -220,28 +208,26 @@ export function MapEditor({
     return () => window.removeEventListener("keydown", handler);
   }, [onSave]);
 
+  // Index categories by their element type for O(1) lookup during unlinked
+  // detection and placement drops.
+  const categoryByElementType = useMemo(() => {
+    const map = new Map<string, (typeof placementRecords)[number]>();
+    for (const group of placementRecords) {
+      map.set(group.category.elementType, group);
+    }
+    return map;
+  }, [placementRecords]);
+
   const unlinkedElementIds = useMemo(() => {
     const ids = new Set<string>();
     for (const el of data.elements) {
-      if (el.type === "booth") {
-        const slug = el.properties.boothSlug;
-        if (!slug || !placementRecords.knownBoothSlugs.has(slug))
-          ids.add(el.id);
-      } else if (el.type === "session_area") {
-        const sid = el.properties.sessionId;
-        if (!sid || !placementRecords.knownSessionIds.has(sid)) ids.add(el.id);
-      } else if (el.type === "meeting_room") {
-        const rid = el.properties.meetingRoomId;
-        if (!rid || !placementRecords.knownRoomIds.has(rid)) ids.add(el.id);
-      }
+      const group = categoryByElementType.get(el.type);
+      if (!group) continue;
+      const linked = el.properties[group.category.linkKey];
+      if (!linked || !group.knownIds.has(String(linked))) ids.add(el.id);
     }
     return ids;
-  }, [
-    data.elements,
-    placementRecords.knownBoothSlugs,
-    placementRecords.knownSessionIds,
-    placementRecords.knownRoomIds,
-  ]);
+  }, [data.elements, categoryByElementType]);
   const [activePathingTool, setActivePathingTool] =
     useState<PathingTool>("select");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -897,32 +883,20 @@ export function MapEditor({
 
     for (const action of config.contextMenu) {
       switch (action) {
-        case "convertToBooth":
-          items.push({
-            label: "Convert to Booth",
-            onClick: () =>
-              updateElementType(contextMenu.elementId, "booth", {
-                color: "#3498DB",
-              }),
-          });
-          break;
-        case "convertToSessionArea":
-          items.push({
-            label: "Convert to Session Location",
-            onClick: () =>
-              updateElementType(contextMenu.elementId, "session_area", {
-                color: "#27AE60",
-              }),
-          });
-          break;
-        case "convertToMeetingRoom":
-          items.push({
-            label: "Convert to Meeting Room",
-            onClick: () =>
-              updateElementType(contextMenu.elementId, "meeting_room", {
-                color: "#F39C12",
-              }),
-          });
+        case "convertToObject":
+          // Offer a conversion to every placement category except the element's
+          // own type — so the available conversions follow the active variant.
+          for (const group of placementRecords) {
+            const { category } = group;
+            if (category.elementType === element.type) continue;
+            items.push({
+              label: category.convertLabel,
+              onClick: () =>
+                updateElementType(contextMenu.elementId, category.elementType, {
+                  color: category.convertColor,
+                }),
+            });
+          }
           break;
         case "convertToShape":
           items.push({
@@ -1285,61 +1259,36 @@ export function MapEditor({
       const cx = (e.clientX - containerRect.left - position.x) / scale;
       const cy = (e.clientY - containerRect.top - position.y) / scale;
 
-      // Resolve display name/code from the record pool
+      const group = categoryByElementType.get(ref.type);
+
+      // Resolve display name (+ any extra props like capacity) from the pool.
       const displayProps: Partial<ElementProperties> = (() => {
-        if (ref.type === "booth") {
-          const found = placementRecords.booths.find(
-            (r) => r.record.slug === ref.id,
-          );
-          return found ? { name: found.record.code } : {};
-        }
-        if (ref.type === "session_area") {
-          const found = placementRecords.sessions.find(
-            (r) => String(r.record.id) === ref.id,
-          );
-          return found ? { name: found.record.title } : {};
-        }
-        // meeting_room
-        const found = placementRecords.meetingRooms.find(
-          (r) => String(r.record.id) === ref.id,
+        if (!group) return {};
+        const found = group.records.find(
+          (r) => group.category.getRecordId(r.record) === ref.id,
         );
-        return found
-          ? {
-              name: found.record.name,
-              ...(found.record.capacity != null
-                ? { capacity: found.record.capacity }
-                : {}),
-            }
-          : {};
+        if (!found) return {};
+        return {
+          name: group.category.getPrimaryLabel(found.record),
+          ...(group.category.getExtraProps?.(found.record) ?? {}),
+        };
       })();
 
-      const linkingProps: Partial<ElementProperties> =
-        ref.type === "booth"
-          ? {
-              boothSlug: ref.id,
-              sessionId: undefined,
-              meetingRoomId: undefined,
-              ...displayProps,
-            }
-          : ref.type === "session_area"
-            ? {
-                sessionId: ref.id,
-                boothSlug: undefined,
-                meetingRoomId: undefined,
-                ...displayProps,
-              }
-            : {
-                meetingRoomId: ref.id,
-                boothSlug: undefined,
-                sessionId: undefined,
-                ...displayProps,
-              };
+      // Set the active category's link key; clear every other category's link
+      // key so a re-linked element is never double-linked.
+      const linkingProps: Record<string, unknown> = {};
+      for (const g of placementRecords) {
+        linkingProps[g.category.linkKey] = undefined;
+      }
+      if (group) linkingProps[group.category.linkKey] = ref.id;
+      Object.assign(linkingProps, displayProps);
+      const linkedProps = linkingProps as Partial<ElementProperties>;
 
       const hit = hitTestAssignable(cx, cy);
 
       if (hit) {
         // Assign record to the existing shape — single undo entry via updateElementType
-        updateElementType(hit.id, ref.type, linkingProps);
+        updateElementType(hit.id, ref.type, linkedProps);
         selectOne(hit.id);
       } else {
         // Create a new element centred on the drop point
@@ -1373,7 +1322,7 @@ export function MapEditor({
             strokeColor: typeStyle.strokeColor ?? "#888888",
             strokeWidth: typeStyle.strokeWidth ?? 1,
             zIndex: maxZ + 1,
-            ...linkingProps,
+            ...linkedProps,
           },
         };
         addElement(newEl);
@@ -1386,6 +1335,7 @@ export function MapEditor({
       data,
       activeLayerId,
       placementRecords,
+      categoryByElementType,
       hitTestAssignable,
       updateElementType,
       addElement,
@@ -1394,12 +1344,10 @@ export function MapEditor({
   );
 
   const handleAutoArrange = useCallback(
-    (
-      type: "booth" | "session_area" | "meeting_room",
-      records: AutoArrangeRecord[],
-    ) => {
+    (category: PlacementCategory, records: AutoArrangeRecord[]) => {
       if (records.length === 0) return;
 
+      const type = category.elementType;
       const typeStyle =
         data.typeStyles?.[type] ?? DEFAULT_TYPE_STYLES[type] ?? {};
       const w = typeStyle.defaultWidth ?? 120;
@@ -1430,12 +1378,9 @@ export function MapEditor({
       const newElements: FloorPlanElement[] = records.map((rec, i) => {
         const col = i % cols;
         const row = Math.floor(i / cols);
-        const linkingProps =
-          type === "booth"
-            ? { boothSlug: rec.recordId }
-            : type === "session_area"
-              ? { sessionId: rec.recordId }
-              : { meetingRoomId: rec.recordId };
+        const linkingProps = {
+          [category.linkKey]: rec.recordId,
+        } as Partial<ElementProperties>;
 
         return {
           id: crypto.randomUUID(),

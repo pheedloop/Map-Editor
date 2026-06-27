@@ -42,5 +42,5 @@ export const sessionAreaTool: ToolDefinition<DrawingRect | null> = {
   ownsGeometry: ["rect", "polygon"],
   optionsBar: ["fill", "stroke", "strokeWidth"],
   propertiesPanel: ["name", "capacity", "width", "height", "rotation", "area"],
-  contextMenu: ["convertToBooth", "convertToMeetingRoom", "convertToShape", "delete"],
+  contextMenu: ["convertToObject", "convertToShape", "delete"],
 };

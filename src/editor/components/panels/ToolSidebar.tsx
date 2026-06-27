@@ -16,6 +16,7 @@ import { IconButton, TrophyIcon } from "../ui";
 import { IconPicker } from "./IconPicker";
 import { getIconEntry } from "../../utils/iconRegistry";
 import type { PlacementRecords } from "../../hooks/usePlacementRecords";
+import type { PlacementCategory } from "../../placement/types";
 import { PlacementPanel } from "./PlacementPanel";
 import type { AutoArrangeRecord } from "./PlacementPanel";
 
@@ -261,7 +262,10 @@ interface ToolSidebarProps {
   nameEditable?: boolean;
   isDirty?: boolean;
   placementRecords: PlacementRecords;
-  onAutoArrange: (type: "booth" | "session_area" | "meeting_room", records: AutoArrangeRecord[]) => void;
+  onAutoArrange: (
+    category: PlacementCategory,
+    records: AutoArrangeRecord[],
+  ) => void;
   /** Resolved usage-tier capabilities. */
   features: FeatureMap;
 }

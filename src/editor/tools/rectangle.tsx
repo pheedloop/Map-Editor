@@ -39,5 +39,5 @@ export const rectangleTool: ToolDefinition<DrawingRect | null> = {
   ownsGeometry: ["rect"],
   optionsBar: ["fill", "stroke", "strokeWidth"],
   propertiesPanel: ["name", "width", "height", "rotation"],
-  contextMenu: ["convertToBooth", "convertToSessionArea", "convertToMeetingRoom", "delete"],
+  contextMenu: ["convertToObject", "delete"],
 };
