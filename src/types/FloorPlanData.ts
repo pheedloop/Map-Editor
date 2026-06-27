@@ -26,6 +26,7 @@ export type ElementType =
   | "booth"
   | "session_area"
   | "meeting_room"
+  | "table"
   | "stage"
   | "walkway"
   | "wall"
@@ -38,6 +39,7 @@ export const ELEMENT_TYPE_TO_LAYER: Record<ElementType, LayerId> = {
   booth: "content",
   session_area: "content",
   meeting_room: "content",
+  table: "content",
   stage: "content",
   walkway: "pathing",
   wall: "pathing",
@@ -137,6 +139,8 @@ export interface ElementProperties {
   sessionId?: string | null;
   // Meeting room-specific
   meetingRoomId?: string | null;
+  // Table-specific (seatplanner) — references SeatTable.code
+  tableCode?: string | null;
   // Label-specific
   text?: string;
   fontSize?: number;
@@ -199,6 +203,7 @@ export const DEFAULT_TYPE_STYLES: TypeStyles = {
   booth:        { color: "#94a3b8", strokeColor: "#888888", strokeWidth: 1, defaultWidth: 120, defaultHeight: 80 },
   session_area: { color: "#27AE60", strokeColor: "#888888", strokeWidth: 1, defaultWidth: 200, defaultHeight: 150 },
   meeting_room: { color: "#F39C12", strokeColor: "#888888", strokeWidth: 1, defaultWidth: 160, defaultHeight: 120 },
+  table:        { color: "#14b8a6", strokeColor: "#888888", strokeWidth: 1, defaultWidth: 90,  defaultHeight: 90 },
 };
 
 export type StateVisualTreatment =

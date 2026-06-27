@@ -9,6 +9,7 @@ import { PolygonShape } from "./elements/PolygonShape";
 import { BoothShape } from "./elements/BoothShape";
 import { SessionAreaShape } from "./elements/SessionAreaShape";
 import { MeetingRoomShape } from "./elements/MeetingRoomShape";
+import { TableShape } from "./elements/TableShape";
 import { TextShape } from "./elements/TextShape";
 import { IconShape } from "./elements/IconShape";
 
@@ -133,6 +134,16 @@ export function ElementShape({
           isLinked={isLinked}
         />
       )}
+      {element.type === "table" && (geo.shape === "rect" || geo.shape === "polygon" || geo.shape === "ellipse" || geo.shape === "circle") && (
+        <TableShape
+          geo={geo}
+          color={color}
+          strokeColor={strokeColor}
+          strokeWidth={strokeWidth}
+          properties={element.properties}
+          isLinked={isLinked}
+        />
+      )}
       {element.type === "label" && geo.shape === "rect" && (
         <TextShape
           geo={geo}
@@ -148,10 +159,10 @@ export function ElementShape({
       {element.type === "icon" && geo.shape === "rect" && element.properties.iconName && (
         <IconShape geo={geo} iconName={element.properties.iconName} color={color} />
       )}
-      {element.type !== "booth" && element.type !== "session_area" && element.type !== "meeting_room" && element.type !== "label" && element.type !== "icon" && geo.shape === "rect" && (
+      {element.type !== "booth" && element.type !== "session_area" && element.type !== "meeting_room" && element.type !== "table" && element.type !== "label" && element.type !== "icon" && geo.shape === "rect" && (
         <RectShape geo={geo} color={color} strokeColor={strokeColor} strokeWidth={strokeWidth} label={label} properties={element.properties} />
       )}
-      {geo.shape === "ellipse" && element.type !== "booth" && element.type !== "session_area" && element.type !== "meeting_room" && (
+      {geo.shape === "ellipse" && element.type !== "booth" && element.type !== "session_area" && element.type !== "meeting_room" && element.type !== "table" && (
         <EllipseShape geo={geo} color={color} strokeColor={strokeColor} strokeWidth={strokeWidth} label={label} properties={element.properties} />
       )}
       {geo.shape === "line" && (
@@ -168,7 +179,7 @@ export function ElementShape({
       {geo.shape === "arc" && (
         <ArcShape geo={geo} color={color} strokeWidth={strokeWidth} />
       )}
-      {geo.shape === "polygon" && element.type !== "booth" && element.type !== "session_area" && element.type !== "meeting_room" && (
+      {geo.shape === "polygon" && element.type !== "booth" && element.type !== "session_area" && element.type !== "meeting_room" && element.type !== "table" && (
         <PolygonShape geo={geo} color={color} strokeColor={strokeColor} strokeWidth={strokeWidth} />
       )}
     </Group>
