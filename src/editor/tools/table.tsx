@@ -1,14 +1,14 @@
-import { PiStorefront } from "react-icons/pi";
+import { PiArmchair } from "react-icons/pi";
 import type { ToolDefinition } from "./types";
 import { useClickDragInteraction } from "./hooks/useClickDragInteraction";
 import type { DrawingRect } from "./hooks/useClickDragInteraction";
 import { RectPreview } from "./previews/RectPreview";
 
-export const boothTool: ToolDefinition<DrawingRect | null> = {
-  id: "booth",
-  label: "Booth",
-  shortcut: "B",
-  icon: <PiStorefront size={20} />,
+export const tableTool: ToolDefinition<DrawingRect | null> = {
+  id: "table",
+  label: "Table",
+  shortcut: "T",
+  icon: <PiArmchair size={20} />,
   cursor: "crosshair",
 
   useInteraction: (ctx) =>
@@ -16,7 +16,7 @@ export const boothTool: ToolDefinition<DrawingRect | null> = {
       type: "element",
       element: {
         id: crypto.randomUUID(),
-        type: "booth",
+        type: "table",
         geometry: {
           shape: "rect",
           x: rect.x,
@@ -25,21 +25,21 @@ export const boothTool: ToolDefinition<DrawingRect | null> = {
           height: rect.height,
         },
         properties: {
-          name: "Booth",
-          color: defaults.fill,
+          name: "Table",
+          color: "#14b8a6",
           strokeColor: defaults.stroke,
           strokeWidth: defaults.strokeWidth,
           zIndex: 1,
-          area: rect.width * rect.height,
+          capacity: null,
         },
       },
     })),
 
   PreviewComponent: RectPreview,
 
-  ownsElementType: "booth",
+  ownsElementType: "table",
   ownsGeometry: ["rect"],
   optionsBar: ["fill", "stroke", "strokeWidth"],
-  propertiesPanel: ["name", "width", "height", "rotation", "area"],
+  propertiesPanel: ["name", "capacity", "width", "height", "rotation"],
   contextMenu: ["convertToObject", "convertToShape", "delete"],
 };

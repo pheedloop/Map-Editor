@@ -9,13 +9,11 @@ import {
 } from "react-icons/pi";
 import type {
   PlacementRecords,
+  CategoryRecords,
   PlacedRecord,
 } from "../../hooks/usePlacementRecords";
-import type {
-  ExhibitorBooth,
-  SessionLocation,
-  MeetingRoom,
-} from "../../../viewer/types";
+import type { PlacementCategory } from "../../placement/types";
+import type { ElementType } from "../../../types";
 
 // ---------------------------------------------------------------------------
 // Data transfer constants
@@ -28,7 +26,8 @@ export const PLACEMENT_SHAPE_ELLIPSE_TYPE =
   "application/x-placement-shape-ellipse";
 
 export interface PlacementRecordRef {
-  type: "booth" | "session_area" | "meeting_room";
+  /** Element type to create/link for the dragged record. */
+  type: ElementType;
   id: string;
   defaultShape: "rect" | "ellipse";
 }
@@ -45,14 +44,10 @@ export interface AutoArrangeRecord {
 const SectionShapeContext = React.createContext<"rect" | "ellipse">("rect");
 
 // ---------------------------------------------------------------------------
-// PanelHeader — search + status filter (panel-level, above all sections)
+// FilterBar — shape picker + search + status filter (per section)
 // ---------------------------------------------------------------------------
 
 type StatusFilter = "all" | "placed" | "unplaced";
-
-// ---------------------------------------------------------------------------
-// FilterBar — shape picker + search + status filter (per section)
-// ---------------------------------------------------------------------------
 
 function FilterBar({
   shape,
@@ -236,13 +231,10 @@ function FilterBar({
 // Section
 // ---------------------------------------------------------------------------
 
-interface SectionConfig {
+interface SectionProps {
+  title: string;
   iconShape: "rect" | "oval";
   iconColor: string;
-}
-
-interface SectionProps extends SectionConfig {
-  title: string;
   placed: number;
   unplaced: number;
   /** Total unplaced across the full (unfiltered) record pool — used by the sparkle button. */
@@ -359,7 +351,7 @@ function Section({
 }
 
 // ---------------------------------------------------------------------------
-// Row components
+// Rows
 // ---------------------------------------------------------------------------
 
 function PlacementRow({
@@ -369,7 +361,7 @@ function PlacementRow({
   children,
 }: {
   isPlaced: boolean;
-  recordType: PlacementRecordRef["type"];
+  recordType: ElementType;
   recordId: string;
   children: React.ReactNode;
 }) {
@@ -410,57 +402,26 @@ function PlacementRow({
   );
 }
 
-function BoothRow({ record, isPlaced }: PlacedRecord<ExhibitorBooth>) {
-  return (
-    <PlacementRow isPlaced={isPlaced} recordType="booth" recordId={record.slug}>
-      <span className="flex-1 text-gray-700 truncate">{record.code}</span>
-      {isPlaced ? (
-        <span className="shrink-0 text-xs font-medium text-green-600">
-          Placed
-        </span>
-      ) : (
-        <span className="shrink-0 text-xs font-medium text-amber-500">
-          Unplaced
-        </span>
-      )}
-    </PlacementRow>
-  );
-}
-
-function SessionRow({ record, isPlaced }: PlacedRecord<SessionLocation>) {
+function RecordRow({
+  category,
+  record,
+  isPlaced,
+}: {
+  category: PlacementCategory;
+  record: unknown;
+  isPlaced: boolean;
+}) {
+  const secondary = category.getSecondaryLabel?.(record);
   return (
     <PlacementRow
       isPlaced={isPlaced}
-      recordType="session_area"
-      recordId={String(record.id)}
-    >
-      <span className="flex-1 text-gray-700 truncate">{record.title}</span>
-      {isPlaced ? (
-        <span className="shrink-0 text-xs font-medium text-green-600">
-          Placed
-        </span>
-      ) : (
-        <span className="shrink-0 text-xs font-medium text-amber-500">
-          Unplaced
-        </span>
-      )}
-    </PlacementRow>
-  );
-}
-
-function MeetingRoomRow({ record, isPlaced }: PlacedRecord<MeetingRoom>) {
-  return (
-    <PlacementRow
-      isPlaced={isPlaced}
-      recordType="meeting_room"
-      recordId={String(record.id)}
+      recordType={category.elementType}
+      recordId={category.getRecordId(record)}
     >
       <span className="flex-1 text-gray-700 truncate">
-        {record.name}
-        {record.capacity != null && (
-          <span className="text-gray-400 ml-1 text-xs">
-            · {record.capacity} cap.
-          </span>
+        {category.getPrimaryLabel(record)}
+        {secondary && (
+          <span className="text-gray-400 ml-1 text-xs">· {secondary}</span>
         )}
       </span>
       {isPlaced ? (
@@ -480,47 +441,48 @@ function MeetingRoomRow({ record, isPlaced }: PlacedRecord<MeetingRoom>) {
 // Main component
 // ---------------------------------------------------------------------------
 
-type SectionId = "booths" | "sessions" | "meetingRooms";
+type SectionFilter = { query: string; status: StatusFilter };
+const emptyFilter: SectionFilter = { query: "", status: "all" };
 
 interface PlacementPanelProps {
   records: PlacementRecords;
   onAutoArrange: (
-    type: "booth" | "session_area" | "meeting_room",
+    category: PlacementCategory,
     records: AutoArrangeRecord[],
+    shape: "rect" | "ellipse",
   ) => void;
 }
 
-export function PlacementPanel({
-  records,
-  onAutoArrange,
-}: PlacementPanelProps) {
-  const { booths, sessions, meetingRooms } = records;
-
-  type SectionFilter = { query: string; status: StatusFilter };
-  const emptyFilter: SectionFilter = { query: "", status: "all" };
-
-  const [openSection, setOpenSection] = useState<SectionId | null>(null);
+export function PlacementPanel({ records, onAutoArrange }: PlacementPanelProps) {
+  // Section state is keyed by category id so it adapts to whatever categories
+  // the active product passes in.
+  const [openSection, setOpenSection] = useState<string | null>(null);
   const [sectionShapes, setSectionShapes] = useState<
-    Record<SectionId, "rect" | "ellipse">
-  >({ booths: "rect", sessions: "rect", meetingRooms: "rect" });
+    Record<string, "rect" | "ellipse">
+  >({});
   const [sectionFilters, setSectionFilters] = useState<
-    Record<SectionId, SectionFilter>
-  >({
-    booths: emptyFilter,
-    sessions: emptyFilter,
-    meetingRooms: emptyFilter,
-  });
+    Record<string, SectionFilter>
+  >({});
 
-  const updateFilter = (id: SectionId, patch: Partial<SectionFilter>) =>
-    setSectionFilters((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  const shapeOf = (id: string) => sectionShapes[id] ?? "rect";
+  const filterOf = (id: string) => sectionFilters[id] ?? emptyFilter;
 
-  const applyFilter = <T,>(
-    items: PlacedRecord<T>[],
-    getText: (r: T) => string,
-    f: SectionFilter,
-  ) => {
+  const updateFilter = (id: string, patch: Partial<SectionFilter>) =>
+    setSectionFilters((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] ?? emptyFilter), ...patch },
+    }));
+
+  const setShape = (id: string) => (s: "rect" | "ellipse") =>
+    setSectionShapes((prev) => ({ ...prev, [id]: s }));
+
+  const toggle = (id: string) =>
+    setOpenSection((prev) => (prev === id ? null : id));
+
+  const applyFilter = (group: CategoryRecords, f: SectionFilter) => {
     const q = f.query.trim().toLowerCase();
-    return items.filter(
+    const getText = group.category.getPrimaryLabel;
+    return group.records.filter(
       (r) =>
         (!q || getText(r.record).toLowerCase().includes(q)) &&
         (f.status === "all" ||
@@ -528,127 +490,55 @@ export function PlacementPanel({
     );
   };
 
-  const filteredBooths = applyFilter(
-    booths,
-    (r) => r.code,
-    sectionFilters.booths,
-  );
-  const filteredSessions = applyFilter(
-    sessions,
-    (r) => r.title,
-    sectionFilters.sessions,
-  );
-  const filteredRooms = applyFilter(
-    meetingRooms,
-    (r) => r.name,
-    sectionFilters.meetingRooms,
-  );
-
-  const toggle = (id: SectionId) =>
-    setOpenSection((prev) => (prev === id ? null : id));
-  const setShape = (id: SectionId) => (s: "rect" | "ellipse") =>
-    setSectionShapes((prev) => ({ ...prev, [id]: s }));
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-1 overflow-y-auto">
-        <Section
-          title="Booths"
-          placed={filteredBooths.filter((r) => r.isPlaced).length}
-          unplaced={filteredBooths.filter((r) => !r.isPlaced).length}
-          totalUnplaced={booths.filter((r) => !r.isPlaced).length}
-          iconShape="rect"
-          iconColor="#3b82f6"
-          isOpen={openSection === "booths"}
-          onToggle={() => toggle("booths")}
-          defaultShape={sectionShapes.booths}
-          onDefaultShapeChange={setShape("booths")}
-          query={sectionFilters.booths.query}
-          onQueryChange={(q) => updateFilter("booths", { query: q })}
-          statusFilter={sectionFilters.booths.status}
-          onStatusFilterChange={(s) => updateFilter("booths", { status: s })}
-          onAutoArrange={() =>
-            onAutoArrange(
-              "booth",
-              booths
-                .filter((r) => !r.isPlaced)
-                .map((r) => ({
-                  recordId: r.record.slug,
-                  recordName: r.record.code,
-                })),
-            )
-          }
-        >
-          {filteredBooths.map((r) => (
-            <BoothRow key={r.record.slug} {...r} />
-          ))}
-        </Section>
-
-        <Section
-          title="Session Locations"
-          placed={filteredSessions.filter((r) => r.isPlaced).length}
-          unplaced={filteredSessions.filter((r) => !r.isPlaced).length}
-          totalUnplaced={sessions.filter((r) => !r.isPlaced).length}
-          iconShape="oval"
-          iconColor="#8b5cf6"
-          isOpen={openSection === "sessions"}
-          onToggle={() => toggle("sessions")}
-          defaultShape={sectionShapes.sessions}
-          onDefaultShapeChange={setShape("sessions")}
-          query={sectionFilters.sessions.query}
-          onQueryChange={(q) => updateFilter("sessions", { query: q })}
-          statusFilter={sectionFilters.sessions.status}
-          onStatusFilterChange={(s) => updateFilter("sessions", { status: s })}
-          onAutoArrange={() =>
-            onAutoArrange(
-              "session_area",
-              sessions
-                .filter((r) => !r.isPlaced)
-                .map((r) => ({
-                  recordId: String(r.record.id),
-                  recordName: r.record.title,
-                })),
-            )
-          }
-        >
-          {filteredSessions.map((r) => (
-            <SessionRow key={r.record.id} {...r} />
-          ))}
-        </Section>
-
-        <Section
-          title="Meeting Rooms"
-          placed={filteredRooms.filter((r) => r.isPlaced).length}
-          unplaced={filteredRooms.filter((r) => !r.isPlaced).length}
-          totalUnplaced={meetingRooms.filter((r) => !r.isPlaced).length}
-          iconShape="rect"
-          iconColor="#f59e0b"
-          isOpen={openSection === "meetingRooms"}
-          onToggle={() => toggle("meetingRooms")}
-          defaultShape={sectionShapes.meetingRooms}
-          onDefaultShapeChange={setShape("meetingRooms")}
-          query={sectionFilters.meetingRooms.query}
-          onQueryChange={(q) => updateFilter("meetingRooms", { query: q })}
-          statusFilter={sectionFilters.meetingRooms.status}
-          onStatusFilterChange={(s) =>
-            updateFilter("meetingRooms", { status: s })
-          }
-          onAutoArrange={() =>
-            onAutoArrange(
-              "meeting_room",
-              meetingRooms
-                .filter((r) => !r.isPlaced)
-                .map((r) => ({
-                  recordId: String(r.record.id),
-                  recordName: r.record.name,
-                })),
-            )
-          }
-        >
-          {filteredRooms.map((r) => (
-            <MeetingRoomRow key={r.record.id} {...r} />
-          ))}
-        </Section>
+        {records.map((group) => {
+          const { category } = group;
+          const id = category.id;
+          const filter = filterOf(id);
+          const filtered = applyFilter(group, filter);
+          return (
+            <Section
+              key={id}
+              title={category.title}
+              iconShape={category.iconShape}
+              iconColor={category.iconColor}
+              placed={filtered.filter((r) => r.isPlaced).length}
+              unplaced={filtered.filter((r) => !r.isPlaced).length}
+              totalUnplaced={group.counts.unplaced}
+              isOpen={openSection === id}
+              onToggle={() => toggle(id)}
+              defaultShape={shapeOf(id)}
+              onDefaultShapeChange={setShape(id)}
+              query={filter.query}
+              onQueryChange={(q) => updateFilter(id, { query: q })}
+              statusFilter={filter.status}
+              onStatusFilterChange={(s) => updateFilter(id, { status: s })}
+              onAutoArrange={() =>
+                onAutoArrange(
+                  category,
+                  group.records
+                    .filter((r) => !r.isPlaced)
+                    .map((r) => ({
+                      recordId: category.getRecordId(r.record),
+                      recordName: category.getPrimaryLabel(r.record),
+                    })),
+                  shapeOf(id),
+                )
+              }
+            >
+              {filtered.map((r: PlacedRecord) => (
+                <RecordRow
+                  key={category.getRecordId(r.record)}
+                  category={category}
+                  record={r.record}
+                  isPlaced={r.isPlaced}
+                />
+              ))}
+            </Section>
+          );
+        })}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { measureTool } from "./measure";
 import { boothTool } from "./booth";
 import { sessionAreaTool } from "./sessionArea";
 import { meetingRoomTool } from "./meetingRoom";
+import { tableTool } from "./table";
 
 // Order determines toolbar display order.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,6 +39,7 @@ const ELEMENT_TYPE_CONFIG_REGISTRY: ToolDefinition<any>[] = [
   boothTool,
   sessionAreaTool,
   meetingRoomTool,
+  tableTool,
 ];
 
 // O(1) lookup by tool id

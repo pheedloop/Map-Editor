@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import type { FloorPlanData } from "../../types";
-import type { ExhibitorBooth, SessionLocation, MeetingRoom } from "../../viewer/types";
+import type { PlacementCategory } from "../placement/types";
 
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
 
-export interface PlacedRecord<T> {
+export interface PlacedRecord<T = unknown> {
   record: T;
   isPlaced: boolean;
 }
@@ -16,18 +16,16 @@ export interface RecordCounts {
   unplaced: number;
 }
 
-export interface PlacementRecords {
-  booths: PlacedRecord<ExhibitorBooth>[];
-  sessions: PlacedRecord<SessionLocation>[];
-  meetingRooms: PlacedRecord<MeetingRoom>[];
-  boothCounts: RecordCounts;
-  sessionCounts: RecordCounts;
-  roomCounts: RecordCounts;
-  /** All slugs/IDs that exist in the record pool — used to detect orphaned elements. */
-  knownBoothSlugs: Set<string>;
-  knownSessionIds: Set<string>;
-  knownRoomIds: Set<string>;
+/** Resolved placement state for a single category. */
+export interface CategoryRecords<T = unknown> {
+  category: PlacementCategory<T>;
+  records: PlacedRecord<T>[];
+  counts: RecordCounts;
+  /** All record ids that exist in the pool — used to detect orphaned elements. */
+  knownIds: Set<string>;
 }
+
+export type PlacementRecords = CategoryRecords[];
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -35,61 +33,35 @@ export interface PlacementRecords {
 
 export function usePlacementRecords(
   data: FloorPlanData,
-  boothRecords: ExhibitorBooth[],
-  sessionRecords: SessionLocation[],
-  meetingRoomRecords: MeetingRoom[],
+  categories: PlacementCategory[],
 ): PlacementRecords {
   return useMemo(() => {
     const elements = data.elements;
 
-    const placedBoothSlugs = new Set(
-      elements
-        .map((el) => el.properties.boothSlug)
-        .filter((slug): slug is string => Boolean(slug))
-    );
+    return categories.map((category) => {
+      // Ids currently referenced by any element via this category's link key.
+      const placedIds = new Set(
+        elements
+          .map((el) => el.properties[category.linkKey])
+          .filter((v): v is NonNullable<typeof v> => Boolean(v))
+          .map((v) => String(v)),
+      );
 
-    const placedSessionIds = new Set(
-      elements
-        .map((el) => el.properties.sessionId)
-        .filter((id): id is string => Boolean(id))
-    );
+      const records: PlacedRecord[] = category.records.map((record) => ({
+        record,
+        isPlaced: placedIds.has(category.getRecordId(record)),
+      }));
 
-    const placedRoomIds = new Set(
-      elements
-        .map((el) => el.properties.meetingRoomId)
-        .filter((id): id is string => Boolean(id))
-    );
+      const counts: RecordCounts = {
+        placed: records.filter((r) => r.isPlaced).length,
+        unplaced: records.filter((r) => !r.isPlaced).length,
+      };
 
-    const booths: PlacedRecord<ExhibitorBooth>[] = boothRecords.map((record) => ({
-      record,
-      isPlaced: placedBoothSlugs.has(record.slug),
-    }));
+      const knownIds = new Set(
+        category.records.map((r) => category.getRecordId(r)),
+      );
 
-    const sessions: PlacedRecord<SessionLocation>[] = sessionRecords.map((record) => ({
-      record,
-      isPlaced: placedSessionIds.has(String(record.id)),
-    }));
-
-    const meetingRooms: PlacedRecord<MeetingRoom>[] = meetingRoomRecords.map((record) => ({
-      record,
-      isPlaced: placedRoomIds.has(String(record.id)),
-    }));
-
-    const countOf = (arr: PlacedRecord<unknown>[]): RecordCounts => ({
-      placed:   arr.filter((r) =>  r.isPlaced).length,
-      unplaced: arr.filter((r) => !r.isPlaced).length,
+      return { category, records, counts, knownIds };
     });
-
-    return {
-      booths,
-      sessions,
-      meetingRooms,
-      boothCounts:   countOf(booths),
-      sessionCounts: countOf(sessions),
-      roomCounts:    countOf(meetingRooms),
-      knownBoothSlugs: new Set(boothRecords.map((r) => r.slug)),
-      knownSessionIds: new Set(sessionRecords.map((r) => String(r.id))),
-      knownRoomIds:    new Set(meetingRoomRecords.map((r) => String(r.id))),
-    };
-  }, [data.elements, boothRecords, sessionRecords, meetingRoomRecords]);
+  }, [data.elements, categories]);
 }
