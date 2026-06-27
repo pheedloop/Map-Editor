@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { ProductSwitcher } from "../components/ProductSwitcher";
 import { SeatPlanEditor } from "./SeatPlanEditor";
-import { SeatplannerPlaceholder } from "./SeatplannerPlaceholder";
+import { SeatPlanViewerDemo } from "./SeatPlanViewerDemo";
 
 type Mode = "editor" | "viewer";
 
@@ -37,13 +37,10 @@ export function SeatplannerApp() {
         <ProductSwitcher current="seatplanner" mode={mode} />
         <div className="w-px h-4 bg-gray-700 mx-1" />
         {modeTab("editor", "Editor")}
+        {modeTab("viewer", "Viewer")}
       </nav>
       <div className="flex-1 overflow-hidden">
-        {mode === "editor" ? (
-          <SeatPlanEditor />
-        ) : (
-          <SeatplannerPlaceholder mode={mode} />
-        )}
+        {mode === "editor" ? <SeatPlanEditor /> : <SeatPlanViewerDemo />}
       </div>
     </div>
   );
