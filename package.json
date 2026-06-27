@@ -18,6 +18,10 @@
       "import": "./dist/viewer.js",
       "types": "./dist/viewer/index.d.ts"
     },
+    "./seatviewer": {
+      "import": "./dist/seatviewer.js",
+      "types": "./dist/seatviewer/index.d.ts"
+    },
     "./style.css": "./dist/style.css"
   },
   "files": [

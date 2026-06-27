@@ -19,5 +19,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/editor/**/*", "src/viewer/**/*", "src/types/**/*"]
+  "include": ["src/editor/**/*", "src/viewer/**/*", "src/seatviewer/**/*", "src/types/**/*"]
 }
