@@ -43,6 +43,12 @@ export interface SeatTicket {
   attendeeTags: string[];
 }
 
+/** A filter chip for the admin ticket list. The host owns the actual filtering. */
+export interface SeatFilterOption {
+  id: string;
+  label: string;
+}
+
 /** A person currently seated at a table (lazy-loaded when a table is opened). */
 export interface SeatOccupant {
   code: string;
@@ -73,8 +79,12 @@ export interface SeatPlanViewerProps {
   onLoadMoreTickets?: () => void;
   searchTerm?: string;
   onSearchChange?: (term: string) => void;
-  filters?: Record<string, string[]>;
-  onFiltersChange?: (filters: Record<string, string[]>) => void;
+  /** Filter chips for the admin list. The host owns filtering (production = API-driven). */
+  filterOptions?: SeatFilterOption[];
+  /** Ids of the currently-active filter chips. */
+  activeFilterIds?: string[];
+  /** Fired when a filter chip is toggled; the host updates its query/filtering. */
+  onFilterToggle?: (id: string) => void;
 
   // Table occupants (lazy)
   occupants?: SeatOccupant[];

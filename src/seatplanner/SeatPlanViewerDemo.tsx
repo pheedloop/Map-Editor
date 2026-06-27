@@ -3,80 +3,87 @@ import { SeatPlanViewer } from "../seatviewer";
 import type { SeatOccupant, SeatPlanMode, SeatTicket } from "../seatviewer";
 import { seatPlanMap } from "../sample-data/seatplan-map";
 import { seatPlanState } from "../sample-data/seatplan-state";
-import { seatPlanTickets } from "../sample-data/seatplan-tickets";
-import { seedOccupants } from "../sample-data/seatplan-occupants";
+import { buildSeatPlanRoster, MY_TICKET_CODES } from "../sample-data/seatplan-roster";
 
-// Two tickets designated as "yours" for the attendee demo: a VIP (head-table
-// tagged) and a general-admission one, so eligibility visibly differs by ticket.
-const MY_TICKET_CODES = new Set(["PUR-8821", "PUR-8826"]);
+const MINE = new Set<string>(MY_TICKET_CODES);
+
+// Only tables actually placed on the map are interactive; build the demo around those.
+const MAPPED_CODES = new Set(
+  seatPlanMap.elements
+    .filter((el) => el.type === "table" && el.properties.tableCode)
+    .map((el) => el.properties.tableCode as string),
+);
+const BASE_TABLES = seatPlanState.filter((t) => MAPPED_CODES.has(t.tableCode));
 
 /**
- * Demo host for the seat plan viewer. Stands in for Charmander: holds the
- * tickets/occupants in local state and implements onAssign/onUnassign so the
- * flow is fully interactive. The toolbar switches between admin and attendee.
+ * Demo host for the seat plan viewer. Stands in for Charmander: holds one roster
+ * of ticket holders in local state. Table occupancy and the per-table occupant
+ * list are both derived from that roster, so the list and the floor always agree.
  */
 export function SeatPlanViewerDemo() {
   const [viewerMode, setViewerMode] = useState<SeatPlanMode>("admin");
   const [lockSelection, setLockSelection] = useState(false);
   const [hideDetails, setHideDetails] = useState(false);
 
-  const [tickets, setTickets] = useState<SeatTicket[]>(seatPlanTickets);
-  const [occByTable, setOccByTable] = useState<Record<string, SeatOccupant[]>>(() =>
-    seedOccupants(seatPlanState),
-  );
+  const [tickets, setTickets] = useState<SeatTicket[]>(() => buildSeatPlanRoster(BASE_TABLES));
   const [search, setSearch] = useState("");
+  const [seatFilter, setSeatFilter] = useState<"all" | "seated" | "unseated">("all");
   const [openCode, setOpenCode] = useState<string | null>(null);
   const selCounter = useRef(9000);
 
-  const tables = useMemo(
-    () => seatPlanState.map((t) => ({ ...t, occupancy: occByTable[t.tableCode]?.length ?? 0 })),
-    [occByTable],
-  );
+  const FILTER_OPTIONS = [
+    { id: "all", label: "All" },
+    { id: "seated", label: "Seated" },
+    { id: "unseated", label: "Unseated" },
+  ];
+
+  // Occupancy per table is the count of tickets currently seated there.
+  const tables = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of tickets) if (t.tableCode) counts.set(t.tableCode, (counts.get(t.tableCode) ?? 0) + 1);
+    return BASE_TABLES.map((t) => ({ ...t, occupancy: counts.get(t.tableCode) ?? 0 }));
+  }, [tickets]);
 
   const visibleTickets = useMemo(() => {
-    if (viewerMode === "attendee") return tickets.filter((t) => MY_TICKET_CODES.has(t.code));
+    if (viewerMode === "attendee") return tickets.filter((t) => MINE.has(t.code));
     const q = search.trim().toLowerCase();
-    if (!q) return tickets;
-    return tickets.filter(
-      (t) =>
+    return tickets.filter((t) => {
+      if (seatFilter === "seated" && !t.tableCode) return false;
+      if (seatFilter === "unseated" && t.tableCode) return false;
+      if (q && !(
         `${t.attendee.firstName} ${t.attendee.lastName}`.toLowerCase().includes(q) ||
-        t.attendee.email.toLowerCase().includes(q),
-    );
-  }, [tickets, search, viewerMode]);
+        t.attendee.email.toLowerCase().includes(q)
+      )) return false;
+      return true;
+    });
+  }, [tickets, search, seatFilter, viewerMode]);
 
-  const occupants = openCode ? occByTable[openCode] ?? [] : [];
+  const occupants = useMemo<SeatOccupant[]>(() => {
+    if (!openCode) return [];
+    return tickets
+      .filter((t) => t.tableCode === openCode)
+      .map((t) => ({
+        code: t.attendee.code,
+        firstName: t.attendee.firstName,
+        lastName: t.attendee.lastName,
+        email: t.attendee.email,
+        organization: t.attendee.organization,
+        seatSelectionCode: t.seatSelectionCode,
+      }));
+  }, [tickets, openCode]);
 
   const handleAssign = useCallback(
     ({ tableCode, purchaseCodes }: { tableCode: string; purchaseCodes: string[] }) => {
-      const added: SeatOccupant[] = [];
       setTickets((prev) =>
-        prev.map((t) => {
-          if (!purchaseCodes.includes(t.code)) return t;
-          const sel = selCounter.current++;
-          added.push({
-            code: t.attendee.code,
-            firstName: t.attendee.firstName,
-            lastName: t.attendee.lastName,
-            email: t.attendee.email,
-            organization: t.attendee.organization,
-            seatSelectionCode: sel,
-          });
-          return { ...t, tableCode, seatSelectionCode: sel };
-        }),
+        prev.map((t) =>
+          purchaseCodes.includes(t.code) ? { ...t, tableCode, seatSelectionCode: selCounter.current++ } : t,
+        ),
       );
-      setOccByTable((prev) => ({ ...prev, [tableCode]: [...(prev[tableCode] ?? []), ...added] }));
     },
     [],
   );
 
   const handleUnassign = useCallback(({ seatSelectionCode }: { seatSelectionCode: number }) => {
-    setOccByTable((prev) => {
-      const next: Record<string, SeatOccupant[]> = {};
-      for (const [code, list] of Object.entries(prev)) {
-        next[code] = list.filter((o) => o.seatSelectionCode !== seatSelectionCode);
-      }
-      return next;
-    });
     setTickets((prev) =>
       prev.map((t) => (t.seatSelectionCode === seatSelectionCode ? { ...t, tableCode: null, seatSelectionCode: null } : t)),
     );
@@ -124,6 +131,9 @@ export function SeatPlanViewerDemo() {
           tickets={visibleTickets}
           searchTerm={search}
           onSearchChange={setSearch}
+          filterOptions={FILTER_OPTIONS}
+          activeFilterIds={[seatFilter]}
+          onFilterToggle={(id) => setSeatFilter(id as "all" | "seated" | "unseated")}
           occupants={occupants}
           onTableOpen={setOpenCode}
           onAssign={handleAssign}

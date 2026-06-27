@@ -8,5 +8,6 @@ export type {
   SeatTableState,
   SeatTicket,
   SeatOccupant,
+  SeatFilterOption,
   SeatPlanViewerProps,
 } from "./types";

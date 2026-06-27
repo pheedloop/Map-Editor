@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { PiMagnifyingGlass, PiCheck } from "react-icons/pi";
-import type { SeatPlanMode, SeatTableState, SeatTicket } from "../types";
+import type { SeatFilterOption, SeatPlanMode, SeatTableState, SeatTicket } from "../types";
 import { isEligible } from "../logic";
 
 interface TicketPanelProps {
@@ -12,6 +12,9 @@ interface TicketPanelProps {
   openTable: SeatTableState | null;
   searchTerm: string;
   onSearchChange: (term: string) => void;
+  filterOptions?: SeatFilterOption[];
+  activeFilterIds?: string[];
+  onFilterToggle?: (id: string) => void;
   /** Resolve a tableCode to its display name (e.g. "Table 7"); falls back to the code. */
   tableLabel?: (code: string) => string | undefined;
   /** Attendee mode: clear the ticket's current seat. Hidden when lockSeatSelectionPage. */
@@ -36,6 +39,9 @@ export function TicketPanel({
   openTable,
   searchTerm,
   onSearchChange,
+  filterOptions,
+  activeFilterIds,
+  onFilterToggle,
   tableLabel,
   onClearTicket,
   lockSeatSelectionPage,
@@ -77,6 +83,26 @@ export function TicketPanel({
           </div>
         ) : (
           <p className="text-sm text-gray-500 m-0">Pick a ticket, then choose an available table.</p>
+        )}
+        {isAdmin && filterOptions && filterOptions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter ticket holders">
+            {filterOptions.map((opt) => {
+              const active = activeFilterIds?.includes(opt.id) ?? false;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onFilterToggle?.(opt.id)}
+                  className={`text-xs font-medium px-2.5 py-1 rounded-full cursor-pointer transition-colors ${
+                    active ? "bg-primary-600 text-white" : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
 

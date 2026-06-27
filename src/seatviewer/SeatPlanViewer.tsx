@@ -25,6 +25,9 @@ export function SeatPlanViewer(props: SeatPlanViewerProps) {
     onLoadMoreTickets,
     searchTerm = "",
     onSearchChange,
+    filterOptions,
+    activeFilterIds,
+    onFilterToggle,
     occupants = [],
     occupantsLoading,
     onTableOpen,
@@ -206,6 +209,9 @@ export function SeatPlanViewer(props: SeatPlanViewerProps) {
         openTable={openTable}
         searchTerm={searchTerm}
         onSearchChange={(t) => onSearchChange?.(t)}
+        filterOptions={filterOptions}
+        activeFilterIds={activeFilterIds}
+        onFilterToggle={onFilterToggle}
         tableLabel={(code) => tableNameByCode.get(code)}
         onClearTicket={handleClearTicket}
         lockSeatSelectionPage={lockSeatSelectionPage}
