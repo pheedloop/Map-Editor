@@ -340,7 +340,14 @@ export function ToolSidebar({
             onClick={() => onToolChange("select")}
           />
           {features.drawingTools !== "hidden" &&
-            toolDefs.map((tool) => {
+            toolDefs
+              // The measure tool is meaningless without real-world scale, so it
+              // follows the scaleCalibration feature.
+              .filter(
+                (tool) =>
+                  !(tool.id === "measure" && features.scaleCalibration === "hidden"),
+              )
+              .map((tool) => {
               const displayTool =
                 tool.id === "icon" && activeIconName
                   ? (() => {

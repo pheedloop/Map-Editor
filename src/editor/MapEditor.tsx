@@ -1830,6 +1830,7 @@ export function MapEditor({
                   data.dimensions.unit !== "px" &&
                   data.dimensions.pixelsPerUnit > 0
                 }
+                showUnit={featureMap.scaleCalibration !== "hidden"}
                 onUnitChange={setDisplayUnit}
               />
             </div>
