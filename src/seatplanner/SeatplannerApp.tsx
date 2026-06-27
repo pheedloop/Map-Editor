@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ProductSwitcher } from "../components/ProductSwitcher";
+import { SeatPlanEditor } from "./SeatPlanEditor";
 import { SeatplannerPlaceholder } from "./SeatplannerPlaceholder";
 
 type Mode = "editor" | "viewer";
@@ -38,7 +39,11 @@ export function SeatplannerApp() {
         {modeTab("editor", "Editor")}
       </nav>
       <div className="flex-1 overflow-hidden">
-        <SeatplannerPlaceholder mode={mode} />
+        {mode === "editor" ? (
+          <SeatPlanEditor />
+        ) : (
+          <SeatplannerPlaceholder mode={mode} />
+        )}
       </div>
     </div>
   );

@@ -25,7 +25,7 @@ import type { DrawingDefaults } from "./components/panels/OptionsBar";
 import type { ToolContext } from "./tools/types";
 import { TOOL_MAP } from "./tools/registry";
 import { useCanvasControls } from "./hooks/useCanvasControls";
-import { useEditorState } from "./hooks/useEditorState";
+import { useEditorState, DEFAULT_PERSIST_KEY } from "./hooks/useEditorState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useClipboard } from "./hooks/useClipboard";
 import { usePathingTool } from "./hooks/usePathingTool";
@@ -95,6 +95,8 @@ interface MapEditorProps {
   onNameChange?: (name: string) => void;
   debug?: boolean;
   persist?: boolean;
+  /** localStorage key for persistence; set per-product to avoid collisions. */
+  persistKey?: string;
   /** Usage-tier preset controlling which features are enabled. Defaults to "premium". */
   tier?: Tier;
   /** Per-feature overrides applied on top of the tier preset. */
@@ -113,10 +115,12 @@ export function MapEditor({
   onNameChange,
   debug: debugProp,
   persist,
+  persistKey,
   tier,
   features,
 }: MapEditorProps) {
   const debug = debugProp || import.meta.env.DEV;
+  const storageKey = persistKey ?? DEFAULT_PERSIST_KEY;
 
   // Resolve usage-tier capabilities once. Tri-state per feature:
   // "enabled" | "locked" (disabled + trophy) | "hidden" (not rendered).
@@ -156,7 +160,7 @@ export function MapEditor({
     redo,
     canUndo,
     canRedo,
-  } = useEditorState(initialData, { persist });
+  } = useEditorState(initialData, { persist, persistKey });
   // Layer state (editor-only, not persisted in FloorPlanData)
   const [layers, setLayers] = useState<LayerDefinition[]>(() =>
     DEFAULT_LAYERS.map((l) => ({ ...l })),
@@ -1480,7 +1484,7 @@ export function MapEditor({
                       // Replace current data by adding/removing elements
                       // Simple approach: reload the page with new data in storage
                       localStorage.setItem(
-                        "map-editor:floorplan",
+                        storageKey,
                         JSON.stringify(imported),
                       );
                       window.location.reload();
@@ -1501,7 +1505,7 @@ export function MapEditor({
                   label: "Reset Demo",
                   danger: true,
                   onClick: () => {
-                    localStorage.removeItem("map-editor:floorplan");
+                    localStorage.removeItem(storageKey);
                     window.location.reload();
                   },
                 },

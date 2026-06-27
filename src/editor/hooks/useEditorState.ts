@@ -5,11 +5,12 @@ import { createWalkableGrid } from "../utils/walkableGrid";
 import { derivePixelsPerUnit } from "../../utils/unitConversion";
 import { useHistory } from "./useHistory";
 
-const STORAGE_KEY = "map-editor:floorplan";
+export const DEFAULT_PERSIST_KEY = "map-editor:floorplan";
+const STORAGE_KEY = DEFAULT_PERSIST_KEY;
 
-function loadFromStorage(): FloorPlanData | null {
+function loadFromStorage(key: string): FloorPlanData | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     return JSON.parse(raw) as FloorPlanData;
   } catch {
@@ -57,20 +58,22 @@ function backfillLayers(data: FloorPlanData): FloorPlanData {
 
 interface UseEditorStateOptions {
   persist?: boolean;
+  /** localStorage key for persistence. Lets distinct products avoid colliding. */
+  persistKey?: string;
 }
 
 export function useEditorState(
   initialData: FloorPlanData,
-  { persist = false }: UseEditorStateOptions = {}
+  { persist = false, persistKey = STORAGE_KEY }: UseEditorStateOptions = {}
 ) {
-  const loadedData = backfillViewerAppearance(backfillLegendEntryIds(backfillTypeStyles(backfillLayers(persist ? loadFromStorage() ?? initialData : initialData))));
+  const loadedData = backfillViewerAppearance(backfillLegendEntryIds(backfillTypeStyles(backfillLayers(persist ? loadFromStorage(persistKey) ?? initialData : initialData))));
   const { present: data, set: setData, replace: replaceData, undo, redo, canUndo, canRedo } = useHistory<FloorPlanData>(loadedData);
 
   // Auto-save to localStorage
   useEffect(() => {
     if (!persist) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data, persist]);
+    localStorage.setItem(persistKey, JSON.stringify(data));
+  }, [data, persist, persistKey]);
 
   const addElement = useCallback((element: FloorPlanElement) => {
     const withLayer = element.layer
@@ -320,8 +323,8 @@ export function useEditorState(
   }, [setData]);
 
   const clearStorage = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-  }, []);
+    localStorage.removeItem(persistKey);
+  }, [persistKey]);
 
   // --- Walkable grid mutations ---
 
