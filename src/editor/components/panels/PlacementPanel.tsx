@@ -449,6 +449,7 @@ interface PlacementPanelProps {
   onAutoArrange: (
     category: PlacementCategory,
     records: AutoArrangeRecord[],
+    shape: "rect" | "ellipse",
   ) => void;
 }
 
@@ -523,6 +524,7 @@ export function PlacementPanel({ records, onAutoArrange }: PlacementPanelProps) 
                       recordId: category.getRecordId(r.record),
                       recordName: category.getPrimaryLabel(r.record),
                     })),
+                  shapeOf(id),
                 )
               }
             >

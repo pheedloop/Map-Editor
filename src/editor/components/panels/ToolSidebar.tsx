@@ -265,6 +265,7 @@ interface ToolSidebarProps {
   onAutoArrange: (
     category: PlacementCategory,
     records: AutoArrangeRecord[],
+    shape: "rect" | "ellipse",
   ) => void;
   /** Resolved usage-tier capabilities. */
   features: FeatureMap;

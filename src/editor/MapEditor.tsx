@@ -1348,7 +1348,11 @@ export function MapEditor({
   );
 
   const handleAutoArrange = useCallback(
-    (category: PlacementCategory, records: AutoArrangeRecord[]) => {
+    (
+      category: PlacementCategory,
+      records: AutoArrangeRecord[],
+      shape: "rect" | "ellipse",
+    ) => {
       if (records.length === 0) return;
 
       const type = category.elementType;
@@ -1386,17 +1390,24 @@ export function MapEditor({
           [category.linkKey]: rec.recordId,
         } as Partial<ElementProperties>;
 
+        const cellX = startX + col * (w + gap);
+        const cellY = startY + row * (h + gap);
+        const geometry: Geometry =
+          shape === "ellipse"
+            ? {
+                shape: "ellipse",
+                x: cellX,
+                y: cellY,
+                radiusX: w / 2,
+                radiusY: h / 2,
+              }
+            : { shape: "rect", x: cellX, y: cellY, width: w, height: h };
+
         return {
           id: crypto.randomUUID(),
           type,
           layer: "content" as LayerId,
-          geometry: {
-            shape: "rect" as const,
-            x: startX + col * (w + gap),
-            y: startY + row * (h + gap),
-            width: w,
-            height: h,
-          },
+          geometry,
           properties: {
             name: rec.recordName,
             color: typeStyle.color ?? "#94a3b8",
@@ -1922,6 +1933,7 @@ export function MapEditor({
       {showTypeDefaultsDialog && (
         <TypeDefaultsDialog
           typeStyles={data.typeStyles ?? {}}
+          typeKeys={placementCategories.map((c) => c.elementType)}
           onUpdateTypeStyles={updateTypeStyles}
           onClose={() => setShowTypeDefaultsDialog(false)}
         />

@@ -126,12 +126,14 @@ function TypeSection({ typeKey, defaults, onChange }: TypeSectionProps) {
 
 interface TypeDefaultsPanelProps {
   typeStyles: TypeStyles;
+  /** Restricts which type sections render (the active product's object types). */
+  typeKeys?: string[];
   onUpdateTypeStyles: (key: string, updates: Partial<ElementTypeDefaults>) => void;
 }
 
-export function TypeDefaultsPanel({ typeStyles, onUpdateTypeStyles }: TypeDefaultsPanelProps) {
+export function TypeDefaultsPanel({ typeStyles, typeKeys, onUpdateTypeStyles }: TypeDefaultsPanelProps) {
   const merged: TypeStyles = { ...DEFAULT_TYPE_STYLES, ...typeStyles };
-  const keys = Object.keys(merged);
+  const keys = typeKeys ?? Object.keys(merged);
 
   return (
     <div className="flex flex-col gap-2">
@@ -139,7 +141,7 @@ export function TypeDefaultsPanel({ typeStyles, onUpdateTypeStyles }: TypeDefaul
         <TypeSection
           key={key}
           typeKey={key}
-          defaults={merged[key]}
+          defaults={merged[key] ?? {}}
           onChange={(updates) => onUpdateTypeStyles(key, updates)}
         />
       ))}
