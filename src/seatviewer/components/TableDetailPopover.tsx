@@ -5,8 +5,6 @@ import { occupancyLevel, type OccupancyLevel } from "../logic";
 interface TableDetailPopoverProps {
   table: SeatTableState;
   tableName: string;
-  /** Viewport (clientX/Y) anchor point — popover is fixed-positioned below it. */
-  position: { x: number; y: number };
   occupants: SeatOccupant[];
   occupantsLoading?: boolean;
   hideAttendeeDetails?: boolean;
@@ -36,7 +34,6 @@ function initials(o: SeatOccupant): string {
 export function TableDetailPopover({
   table,
   tableName,
-  position,
   occupants,
   occupantsLoading,
   hideAttendeeDetails,
@@ -60,9 +57,9 @@ export function TableDetailPopover({
   return (
     <div
       role="dialog"
+      aria-modal="false"
       aria-label={`${tableName} details`}
-      className="fixed z-[9999] w-64 -translate-x-1/2 translate-y-3 bg-card border border-gray-300 rounded-xl shadow-[0_10px_32px_rgba(38,59,90,0.2)] overflow-hidden"
-      style={{ left: position.x, top: position.y }}
+      className="absolute z-[9999] w-72 max-w-[calc(100%-24px)] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card border border-gray-300 rounded-xl shadow-[0_16px_48px_rgba(38,59,90,0.28)] overflow-hidden"
     >
       <div className="flex items-start gap-2 p-3 border-b border-gray-200">
         <div className="flex-1 min-w-0">

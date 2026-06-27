@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Stage, Layer, Rect } from "react-konva";
 import type { FloorPlanData } from "../../types";
 import { useCanvasControls } from "../../editor/hooks/useCanvasControls";
@@ -16,8 +16,12 @@ export interface SeatPlanCanvasProps {
   highlightedTableCode?: string | null;
   /** Tables (by code) de-emphasized — e.g. not eligible for the current selection. */
   dimmedTableCodes?: ReadonlySet<string> | null;
-  /** Fired when an interactive table is clicked. screenX/Y are viewport pixels (popover anchor). */
-  onTableClick?: (tableCode: string, screenX: number, screenY: number) => void;
+  /** Fired when an interactive table is clicked. */
+  onTableClick?: (tableCode: string) => void;
+  /** Fired when empty canvas (anything other than an interactive table) is clicked. */
+  onBackgroundClick?: () => void;
+  /** Overlay content positioned within the canvas region (e.g. the table dialog). */
+  children?: ReactNode;
 }
 
 /**
@@ -32,6 +36,8 @@ export function SeatPlanCanvas({
   highlightedTableCode,
   dimmedTableCodes,
   onTableClick,
+  onBackgroundClick,
+  children,
 }: SeatPlanCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoveredTableCode, setHoveredTableCode] = useState<string | null>(null);
@@ -55,6 +61,7 @@ export function SeatPlanCanvas({
         draggable
         onWheel={handleWheel}
         onDragEnd={handleDragEnd}
+        onClick={() => onBackgroundClick?.()}
       >
         <Layer>
           <Rect
@@ -92,15 +99,14 @@ export function SeatPlanCanvas({
                 onMouseEnter={interactive ? () => setHoveredTableCode(tableCode) : undefined}
                 onMouseLeave={interactive ? () => setHoveredTableCode(null) : undefined}
                 onClick={
-                  interactive && onTableClick
-                    ? (e) => onTableClick(tableCode!, e.screenX, e.screenY)
-                    : undefined
+                  interactive && onTableClick ? () => onTableClick(tableCode!) : undefined
                 }
               />
             );
           })}
         </Layer>
       </Stage>
+      {children}
     </div>
   );
 }

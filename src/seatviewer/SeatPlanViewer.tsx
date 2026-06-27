@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SeatPlanViewerProps } from "./types";
 import { isEligible, occupancyColor } from "./logic";
 import { SeatPlanCanvas } from "./components/SeatPlanCanvas";
@@ -34,7 +34,6 @@ export function SeatPlanViewer(props: SeatPlanViewerProps) {
 
   const [selectedCodes, setSelectedCodes] = useState<ReadonlySet<string>>(new Set());
   const [openTableCode, setOpenTableCode] = useState<string | null>(null);
-  const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null);
   const [assigning, setAssigning] = useState(false);
 
   const tableByCode = useMemo(
@@ -97,21 +96,29 @@ export function SeatPlanViewer(props: SeatPlanViewerProps) {
   );
 
   const handleTableClick = useCallback(
-    (tableCode: string, screenX: number, screenY: number) => {
+    (tableCode: string) => {
       setOpenTableCode((prev) => {
         const next = prev === tableCode ? null : tableCode;
         if (next) onTableOpen?.(next);
         return next;
       });
-      setPopoverPos({ x: screenX, y: screenY });
     },
     [onTableOpen],
   );
 
   const closePopover = useCallback(() => {
     setOpenTableCode(null);
-    setPopoverPos(null);
   }, []);
+
+  // Dismiss the open popover on Escape.
+  useEffect(() => {
+    if (!openTableCode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closePopover();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openTableCode, closePopover]);
 
   // Selected tickets that are eligible for the open table.
   const assignableCodes = useMemo(() => {
@@ -163,23 +170,23 @@ export function SeatPlanViewer(props: SeatPlanViewerProps) {
         highlightedTableCode={openTableCode}
         dimmedTableCodes={dimmedTableCodes}
         onTableClick={handleTableClick}
-      />
-
-      {openTable && popoverPos && (
-        <TableDetailPopover
-          table={openTable}
-          tableName={tableNameByCode.get(openTable.tableCode) ?? openTable.tableCode}
-          position={popoverPos}
-          occupants={occupants}
-          occupantsLoading={occupantsLoading}
-          hideAttendeeDetails={hideAttendeeDetails}
-          assignableCount={assignableCodes.length}
-          assigning={assigning}
-          onAssign={handleAssign}
-          onUnassign={handleUnassign}
-          onClose={closePopover}
-        />
-      )}
+        onBackgroundClick={closePopover}
+      >
+        {openTable && (
+          <TableDetailPopover
+            table={openTable}
+            tableName={tableNameByCode.get(openTable.tableCode) ?? openTable.tableCode}
+            occupants={occupants}
+            occupantsLoading={occupantsLoading}
+            hideAttendeeDetails={hideAttendeeDetails}
+            assignableCount={assignableCodes.length}
+            assigning={assigning}
+            onAssign={handleAssign}
+            onUnassign={handleUnassign}
+            onClose={closePopover}
+          />
+        )}
+      </SeatPlanCanvas>
     </div>
   );
 }
