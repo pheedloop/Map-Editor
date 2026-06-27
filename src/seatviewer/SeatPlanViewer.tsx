@@ -4,6 +4,7 @@ import { isEligible, occupancyColor } from "./logic";
 import { SeatPlanCanvas } from "./components/SeatPlanCanvas";
 import { TicketPanel } from "./components/TicketPanel";
 import { TableDetailPopover } from "./components/TableDetailPopover";
+import { OccupancyLegend } from "./components/OccupancyLegend";
 
 /**
  * Presentational seat plan viewer. Renders a FloorPlanData with per-table
@@ -30,6 +31,7 @@ export function SeatPlanViewer(props: SeatPlanViewerProps) {
     onAssign,
     onUnassign,
     hideAttendeeDetails,
+    lockSeatSelectionPage,
   } = props;
 
   const [selectedCodes, setSelectedCodes] = useState<ReadonlySet<string>>(new Set());
@@ -148,6 +150,52 @@ export function SeatPlanViewer(props: SeatPlanViewerProps) {
     [onUnassign],
   );
 
+  const handleClearTicket = useCallback(
+    (ticket: { seatSelectionCode: number | null }) => {
+      if (ticket.seatSelectionCode != null) handleUnassign(ticket.seatSelectionCode);
+    },
+    [handleUnassign],
+  );
+
+  // Assign CTA (label/disabled/hint) — centralized so admin & attendee read correctly.
+  const assignCta = useMemo((): { label: string; disabled: boolean; hint?: string } => {
+    if (!openTable) return { label: "Assign", disabled: true };
+    if (openTable.isLocked) return { label: "Table locked", disabled: true, hint: "This table isn’t open for selection." };
+    if (openTable.occupancy >= openTable.seatCount) return { label: "Table full", disabled: true, hint: "No seats left at this table." };
+
+    if (mode === "admin") {
+      if (assignableCodes.length > 0) {
+        const extra = selectedCodes.size - assignableCodes.length;
+        return {
+          label: `Assign ${assignableCodes.length} selected`,
+          disabled: false,
+          hint: extra > 0 ? `${extra} of ${selectedCodes.size} selected aren’t eligible for this table.` : undefined,
+        };
+      }
+      return {
+        label: "Select eligible ticket holders",
+        disabled: true,
+        hint: selectedCodes.size > 0 ? "None of the selected are eligible for this table." : undefined,
+      };
+    }
+
+    // attendee — single select
+    const code = [...selectedCodes][0];
+    const ticket = code ? ticketByCode.get(code) : undefined;
+    if (!ticket) return { label: "Select a ticket first", disabled: true, hint: "Choose one of your tickets on the left." };
+    if (ticket.tableCode) {
+      const at = tableNameByCode.get(ticket.tableCode) ?? ticket.tableCode;
+      return { label: "Ticket already seated", disabled: true, hint: `${ticket.attendee.firstName} is at ${at}. Clear it to move.` };
+    }
+    if (!openTable.eligibleTicketCodes.includes(ticket.ticketCode)) {
+      return { label: "Not eligible", disabled: true, hint: `${ticket.ticketName} can’t be seated at this table.` };
+    }
+    if (openTable.tags.length > 0 && !ticket.attendeeTags.some((t) => openTable.tags.includes(t))) {
+      return { label: "Reserved table", disabled: true, hint: "This table is reserved for a specific group." };
+    }
+    return { label: `Assign ${ticket.attendee.firstName} here`, disabled: false };
+  }, [openTable, mode, assignableCodes, selectedCodes, ticketByCode, tableNameByCode]);
+
   return (
     <div className="pl-map-editor flex h-full min-h-0 bg-gray-100 relative">
       <TicketPanel
@@ -159,6 +207,8 @@ export function SeatPlanViewer(props: SeatPlanViewerProps) {
         searchTerm={searchTerm}
         onSearchChange={(t) => onSearchChange?.(t)}
         tableLabel={(code) => tableNameByCode.get(code)}
+        onClearTicket={handleClearTicket}
+        lockSeatSelectionPage={lockSeatSelectionPage}
         loading={ticketsLoading}
         hasMore={hasMoreTickets}
         onLoadMore={onLoadMoreTickets}
@@ -172,6 +222,7 @@ export function SeatPlanViewer(props: SeatPlanViewerProps) {
         onTableClick={handleTableClick}
         onBackgroundClick={closePopover}
       >
+        <OccupancyLegend />
         {openTable && (
           <TableDetailPopover
             table={openTable}
@@ -179,7 +230,10 @@ export function SeatPlanViewer(props: SeatPlanViewerProps) {
             occupants={occupants}
             occupantsLoading={occupantsLoading}
             hideAttendeeDetails={hideAttendeeDetails}
-            assignableCount={assignableCodes.length}
+            allowUnassign={mode === "admin" || !lockSeatSelectionPage}
+            assignLabel={assignCta.label}
+            assignDisabled={assignCta.disabled}
+            assignHint={assignCta.hint}
             assigning={assigning}
             onAssign={handleAssign}
             onUnassign={handleUnassign}

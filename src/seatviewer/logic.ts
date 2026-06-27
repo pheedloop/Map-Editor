@@ -31,6 +31,20 @@ export function occupancyColor(table: OccupancyInput): string {
   return OCCUPANCY_FILL[occupancyLevel(table)];
 }
 
+export interface OccupancyLegendItem {
+  level: OccupancyLevel;
+  label: string;
+  color: string;
+}
+
+/** Legend entries describing the occupancy color scale, in order. */
+export const OCCUPANCY_LEGEND: OccupancyLegendItem[] = [
+  { level: "available", label: "Open (>50% free)", color: OCCUPANCY_FILL.available },
+  { level: "half", label: "Filling (10–50%)", color: OCCUPANCY_FILL.half },
+  { level: "low", label: "Almost full (<10%)", color: OCCUPANCY_FILL.low },
+  { level: "full", label: "Full / locked", color: OCCUPANCY_FILL.full },
+];
+
 /**
  * Whether a ticket can be assigned to a table. Pure UI logic mirrored from both
  * Charmander tools: type allowlist + not full/locked + ticket unassigned, plus

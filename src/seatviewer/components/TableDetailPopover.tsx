@@ -8,8 +8,12 @@ interface TableDetailPopoverProps {
   occupants: SeatOccupant[];
   occupantsLoading?: boolean;
   hideAttendeeDetails?: boolean;
-  /** Number of currently-selected tickets eligible for this table. */
-  assignableCount: number;
+  /** Whether per-occupant Remove is offered (false in attendee mode when locked). */
+  allowUnassign?: boolean;
+  /** Assign CTA, computed by the shell so admin/attendee messaging stays centralized. */
+  assignLabel: string;
+  assignDisabled: boolean;
+  assignHint?: string;
   assigning?: boolean;
   onAssign: () => void;
   onUnassign: (seatSelectionCode: number) => void;
@@ -37,7 +41,10 @@ export function TableDetailPopover({
   occupants,
   occupantsLoading,
   hideAttendeeDetails,
-  assignableCount,
+  allowUnassign = true,
+  assignLabel,
+  assignDisabled,
+  assignHint,
   assigning,
   onAssign,
   onUnassign,
@@ -45,14 +52,6 @@ export function TableDetailPopover({
 }: TableDetailPopoverProps) {
   const level = occupancyLevel(table);
   const seatsFree = Math.max(0, table.seatCount - table.occupancy);
-  const isFull = table.occupancy >= table.seatCount;
-
-  let label: string;
-  let disabled = true;
-  if (table.isLocked) label = "Table locked";
-  else if (isFull) label = "Table full";
-  else if (assignableCount > 0) { label = `Assign ${assignableCount} selected`; disabled = !!assigning; }
-  else label = "Select eligible ticket holders";
 
   return (
     <div
@@ -88,7 +87,7 @@ export function TableDetailPopover({
                 <span className="block text-sm font-medium text-gray-700 truncate">{o.firstName} {o.lastName}</span>
                 <span className="block text-xs text-gray-500 truncate">{o.organization || o.email}</span>
               </span>
-              {o.seatSelectionCode != null && (
+              {allowUnassign && o.seatSelectionCode != null && (
                 <button
                   type="button"
                   onClick={() => onUnassign(o.seatSelectionCode as number)}
@@ -105,12 +104,13 @@ export function TableDetailPopover({
       <div className="p-3 border-t border-gray-200 bg-gray-100">
         <button
           type="button"
-          disabled={disabled}
+          disabled={assignDisabled || assigning}
           onClick={onAssign}
           className="w-full text-sm font-medium py-2.5 rounded-lg cursor-pointer disabled:cursor-not-allowed bg-primary-600 text-white hover:bg-primary-700 disabled:bg-gray-200 disabled:text-gray-400"
         >
-          {assigning ? "Assigning…" : label}
+          {assigning ? "Assigning…" : assignLabel}
         </button>
+        {assignHint && <p className="text-xs text-gray-500 text-center mt-2 m-0">{assignHint}</p>}
       </div>
     </div>
   );
