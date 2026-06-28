@@ -7,7 +7,7 @@
 // (`#editor`, `#viewer`, ...). App.tsx resolves the product and delegates to
 // that product's self-contained route module, which owns its own hash routing.
 
-export type Product = "map" | "seatplanner";
+export type Product = "map" | "seatplanner" | "badge";
 
 export const DEFAULT_PRODUCT: Product = "map";
 
@@ -15,6 +15,7 @@ export const DEFAULT_PRODUCT: Product = "map";
 export function getProduct(): Product {
   const seg = window.location.pathname.replace(/^\/+/, "").split("/")[0];
   if (seg === "seatplanner") return "seatplanner";
+  if (seg === "badge") return "badge";
   return DEFAULT_PRODUCT;
 }
 
