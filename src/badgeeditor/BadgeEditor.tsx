@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { useCanvasControls } from "../editor/hooks/useCanvasControls";
 import { useHistory } from "../editor/hooks/useHistory";
-import { StatusBar } from "../editor/components/StatusBar";
-import { Button, TabBar, type MenuEntry } from "../editor/components/ui";
+import { Button, IconButton, TabBar, type MenuEntry } from "../editor/components/ui";
 import { BadgeTopBar, modKey } from "./BadgeTopBar";
 import { BadgeCanvas } from "./BadgeCanvas";
 import { BadgeSidebar } from "./BadgeSidebar";
@@ -31,6 +30,9 @@ export interface BadgeEditorProps {
   /** Show the debug affordance (badge_layout JSON viewer). */
   debug?: boolean;
 }
+
+/** Inches → compact string (trims trailing zeros): 4, 5.5, 2.85. */
+const fmtIn = (n: number) => String(+n.toFixed(2));
 
 /** True when a keystroke is going to a form field — don't hijack shortcuts. */
 function isEditableTarget(t: EventTarget | null): boolean {
@@ -61,11 +63,11 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
     canRedo,
   } = useHistory<BadgeDocument>(initial);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [showLayout, setShowLayout] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
-  const clipboard = useRef<BadgeField | null>(null);
+  const clipboard = useRef<BadgeField[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const controls = useCanvasControls(containerRef);
@@ -74,14 +76,42 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
   const pageIndex = Math.min(activePageIndex, doc.pages.length - 1);
   const activePage = doc.pages[pageIndex];
 
+  // Properties panel edits the field only when exactly one is selected.
   const selectedField =
-    activePage.fields.find((f) => f.id === selectedId) ?? null;
+    selectedIds.size === 1
+      ? activePage.fields.find((f) => selectedIds.has(f.id)) ?? null
+      : null;
   const flattened = useMemo(() => flatten(doc), [doc]);
 
   const selectPage = useCallback((i: number) => {
     setActivePageIndex(i);
-    setSelectedId(null);
+    setSelectedIds(new Set());
   }, []);
+
+  // --- Selection ---
+  const selectField = useCallback((id: string, additive: boolean) => {
+    setSelectedIds((prev) => {
+      if (additive) {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }
+      if (prev.has(id) && prev.size > 1) return prev; // keep group for drag
+      return new Set([id]);
+    });
+  }, []);
+
+  const marqueeSelect = useCallback((ids: string[], additive: boolean) => {
+    setSelectedIds((prev) => {
+      if (!additive) return new Set(ids);
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   // --- Mutations (target the active page) ---
 
@@ -90,71 +120,73 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
     [setDoc],
   );
 
-  const addField = useCallback(
-    (fieldKey: string) => {
-      const field = createField(fieldKey);
+  /** Replace the active page's fields via a transform. */
+  const mutateActivePage = useCallback(
+    (fn: (fields: BadgeField[]) => BadgeField[]) => {
       setDoc((d) => ({
         ...d,
         pages: d.pages.map((p, i) =>
-          i === pageIndex ? { ...p, fields: [...p.fields, field] } : p,
+          i === pageIndex ? { ...p, fields: fn(p.fields) } : p,
         ),
       }));
-      setSelectedId(field.id);
     },
     [setDoc, pageIndex],
+  );
+
+  const addField = useCallback(
+    (fieldKey: string) => {
+      const field = createField(fieldKey);
+      mutateActivePage((fields) => [...fields, field]);
+      setSelectedIds(new Set([field.id]));
+    },
+    [mutateActivePage],
   );
 
   const updateField = useCallback(
     (id: string, patch: Partial<BadgeField>) => {
-      setDoc((d) => ({
-        ...d,
-        pages: d.pages.map((p, i) =>
-          i === pageIndex
-            ? {
-                ...p,
-                fields: p.fields.map((f) => (f.id === id ? { ...f, ...patch } : f)),
-              }
-            : p,
-        ),
-      }));
+      mutateActivePage((fields) =>
+        fields.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+      );
     },
-    [setDoc, pageIndex],
+    [mutateActivePage],
   );
 
-  const deleteField = useCallback(
-    (id: string) => {
-      setDoc((d) => ({
-        ...d,
-        pages: d.pages.map((p, i) =>
-          i === pageIndex ? { ...p, fields: p.fields.filter((f) => f.id !== id) } : p,
-        ),
-      }));
-      setSelectedId((cur) => (cur === id ? null : cur));
+  /** Commit a (possibly multi-field) move in one history entry. */
+  const moveMany = useCallback(
+    (updates: { id: string; top: number; left: number }[]) => {
+      const byId = new Map(updates.map((u) => [u.id, u]));
+      mutateActivePage((fields) =>
+        fields.map((f) => {
+          const u = byId.get(f.id);
+          return u ? { ...f, top: u.top, left: u.left } : f;
+        }),
+      );
     },
-    [setDoc, pageIndex],
+    [mutateActivePage],
   );
+
+  const deleteSelected = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    mutateActivePage((fields) => fields.filter((f) => !selectedIds.has(f.id)));
+    setSelectedIds(new Set());
+  }, [mutateActivePage, selectedIds]);
 
   const copySelected = useCallback(() => {
-    if (selectedField) clipboard.current = { ...selectedField };
-  }, [selectedField]);
+    const picked = activePage.fields.filter((f) => selectedIds.has(f.id));
+    if (picked.length) clipboard.current = picked.map((f) => ({ ...f }));
+  }, [activePage, selectedIds]);
 
   const pasteClipboard = useCallback(() => {
-    const src = clipboard.current;
-    if (!src) return;
-    const field: BadgeField = {
+    if (!clipboard.current.length) return;
+    const pasted = clipboard.current.map((src) => ({
       ...src,
       id: uuid(),
       top: src.top + 0.15,
       left: src.left + 0.15,
-    };
-    setDoc((d) => ({
-      ...d,
-      pages: d.pages.map((p, i) =>
-        i === pageIndex ? { ...p, fields: [...p.fields, field] } : p,
-      ),
     }));
-    setSelectedId(field.id);
-  }, [setDoc, pageIndex]);
+    mutateActivePage((fields) => [...fields, ...pasted]);
+    setSelectedIds(new Set(pasted.map((f) => f.id)));
+  }, [mutateActivePage]);
 
   // Apply fold/panel-size changes: rebuild the pages array, preserving existing
   // pages' fields and applying the per-panel invert overrides from the dialog.
@@ -177,7 +209,7 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
         return { ...d, fold, panelSize, pages };
       });
       setActivePageIndex((idx) => Math.min(idx, PAGE_COUNT[fold] - 1));
-      setSelectedId(null);
+      setSelectedIds(new Set());
     },
     [setDoc],
   );
@@ -207,14 +239,14 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
       } else if (mod && e.key.toLowerCase() === "v") {
         e.preventDefault();
         pasteClipboard();
-      } else if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
+      } else if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size) {
         e.preventDefault();
-        deleteField(selectedId);
+        deleteSelected();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, deleteField, undo, redo, copySelected, pasteClipboard, handleSave]);
+  }, [selectedIds, deleteSelected, undo, redo, copySelected, pasteClipboard, handleSave]);
 
   // --- Menus ---
 
@@ -256,22 +288,22 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
     { label: "Redo", shortcut: `${modKey}⇧Z`, disabled: !canRedo, onClick: redo },
     { type: "divider" },
     {
-      label: "Copy",
+      label: selectedIds.size > 1 ? `Copy (${selectedIds.size})` : "Copy",
       shortcut: `${modKey}C`,
-      disabled: !selectedField,
+      disabled: selectedIds.size === 0,
       onClick: copySelected,
     },
     {
       label: "Paste",
       shortcut: `${modKey}V`,
-      disabled: !clipboard.current,
+      disabled: clipboard.current.length === 0,
       onClick: pasteClipboard,
     },
     {
-      label: "Delete",
+      label: selectedIds.size > 1 ? `Delete (${selectedIds.size})` : "Delete",
       shortcut: "⌫",
-      disabled: !selectedId,
-      onClick: () => selectedId && deleteField(selectedId),
+      disabled: selectedIds.size === 0,
+      onClick: deleteSelected,
     },
   ];
 
@@ -307,15 +339,6 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
                 ⤓ prints upside-down
               </span>
             )}
-            <div className="flex-1" />
-            <Button
-              variant="outline"
-              color="neutral"
-              size="sm"
-              onClick={() => setShowSetup(true)}
-            >
-              Badge Setup…
-            </Button>
           </div>
 
           <div
@@ -325,25 +348,41 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
             <BadgeCanvas
               page={activePage}
               panelSize={doc.panelSize}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
+              selectedIds={selectedIds}
+              onFieldMouseDown={selectField}
+              onClearSelection={clearSelection}
+              onMarqueeSelect={marqueeSelect}
               onChangeField={updateField}
+              onMoveMany={moveMany}
               scale={controls.scale}
               position={controls.position}
               stageSize={controls.stageSize}
               stageRef={controls.stageRef}
               onWheel={controls.handleWheel}
-              onDragEnd={controls.handleDragEnd}
+              onPositionChange={controls.setPosition}
             />
           </div>
-          <StatusBar
-            scale={controls.scale}
-            onZoomReset={controls.zoomReset}
-            unit="ft"
-            isCalibrated={false}
-            showUnit={false}
-            onUnitChange={() => {}}
-          />
+          {/* Footer — page + overall badge size, and zoom (mirrors StatusBar) */}
+          <div className="relative z-20 flex items-center justify-between px-3 py-1.5 bg-white border-t border-gray-200 text-xs text-gray-500">
+            <div className="flex items-center gap-2">
+              <span>
+                Page {fmtIn(doc.panelSize.width)} × {fmtIn(doc.panelSize.height)}"
+              </span>
+              <span className="text-gray-300">·</span>
+              <span>
+                Badge {fmtIn(doc.panelSize.width)} ×{" "}
+                {fmtIn(doc.panelSize.height * doc.pages.length)}"
+              </span>
+            </div>
+            <IconButton
+              size="sm"
+              onClick={controls.zoomReset}
+              className="px-2 w-auto text-xs text-gray-500"
+              title="Click to reset zoom"
+            >
+              {Math.round(controls.scale * 100)}%
+            </IconButton>
+          </div>
         </div>
 
         {showLayout ? (
@@ -355,11 +394,28 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
               {JSON.stringify(flattened.layout, null, 2)}
             </pre>
           </aside>
+        ) : selectedIds.size > 1 ? (
+          <aside className="w-60 shrink-0 border-l border-gray-200 bg-white flex flex-col">
+            <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-600">
+                {selectedIds.size} fields selected
+              </span>
+              <Button variant="ghost" color="negative" size="sm" onClick={deleteSelected}>
+                Delete
+              </Button>
+            </div>
+            <p className="p-3 text-xs text-gray-400">
+              Drag to move them together, or select a single field to edit its
+              properties.
+            </p>
+          </aside>
         ) : (
           <PropertiesPanel
             field={selectedField}
-            onChange={(patch) => selectedId && updateField(selectedId, patch)}
-            onDelete={() => selectedId && deleteField(selectedId)}
+            onChange={(patch) =>
+              selectedField && updateField(selectedField.id, patch)
+            }
+            onDelete={deleteSelected}
           />
         )}
       </div>
