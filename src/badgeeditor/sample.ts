@@ -18,6 +18,7 @@ export function createSampleDocument(): BadgeDocument {
 
   return {
     version: BADGE_DOCUMENT_VERSION,
+    name: "Untitled Badge",
     panelSize: { width: 3.64, height: 5.5 },
     fold: "none",
     pages: [{ id: "front", role: "front", fields: [firstName, qr] }],

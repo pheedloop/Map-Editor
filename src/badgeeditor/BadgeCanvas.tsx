@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
-import { Stage, Layer, Rect, Text, Group, Transformer } from "react-konva";
+import { Stage, Layer, Rect, Text, Group, Line, Transformer } from "react-konva";
 import type Konva from "konva";
 import { DPI, type BadgeField, type BadgePage } from "./model";
 import { fieldDisplayText } from "./factory";
+import { fieldSizePx, useBadgeGuides } from "./useBadgeGuides";
 
 // Canvas renders at 96px per inch (the legacy DPI); zoom is layered on top via
 // useCanvasControls' `scale`.
@@ -40,6 +41,8 @@ export function BadgeCanvas({
 }: BadgeCanvasProps) {
   const transformerRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef(new Map<string, Konva.Group>());
+
+  const { activeGuides, snap, clear } = useBadgeGuides(page.fields, panelSize);
 
   const selectedField = page.fields.find((f) => f.id === selectedId) ?? null;
 
@@ -101,15 +104,44 @@ export function BadgeCanvas({
           <FieldShape
             key={field.id}
             field={field}
-            selected={field.id === selectedId}
             registerRef={(node) => {
               if (node) nodeRefs.current.set(field.id, node);
               else nodeRefs.current.delete(field.id);
             }}
             onSelect={() => onSelect(field.id)}
             onChange={(patch) => onChangeField(field.id, patch)}
+            onDragMove={(node) => {
+              const { w, h } = fieldSizePx(field);
+              const { x, y } = snap(field.id, node.x(), node.y(), w, h);
+              node.x(x);
+              node.y(y);
+            }}
+            onDragFinish={() => clear()}
           />
         ))}
+
+        {/* Alignment guides */}
+        {activeGuides.map((g, i) =>
+          g.axis === "x" ? (
+            <Line
+              key={`gx-${i}`}
+              points={[g.position, 0, g.position, panelH]}
+              stroke="#ec4899"
+              strokeWidth={1}
+              dash={[4, 4]}
+              listening={false}
+            />
+          ) : (
+            <Line
+              key={`gy-${i}`}
+              points={[0, g.position, panelW, g.position]}
+              stroke="#ec4899"
+              strokeWidth={1}
+              dash={[4, 4]}
+              listening={false}
+            />
+          ),
+        )}
 
         <Transformer
           ref={transformerRef}
@@ -130,18 +162,32 @@ export function BadgeCanvas({
 
 interface FieldShapeProps {
   field: BadgeField;
-  selected: boolean;
   registerRef: (node: Konva.Group | null) => void;
   onSelect: () => void;
   onChange: (patch: Partial<BadgeField>) => void;
+  /** Live snapping during drag — may reposition the node in place. */
+  onDragMove: (node: Konva.Node) => void;
+  /** Drag finished — clear guides. */
+  onDragFinish: () => void;
 }
 
-function FieldShape({ field, registerRef, onSelect, onChange }: FieldShapeProps) {
+function FieldShape({
+  field,
+  registerRef,
+  onSelect,
+  onChange,
+  onDragMove,
+  onDragFinish,
+}: FieldShapeProps) {
   const x = field.left * PPI;
   const y = field.top * PPI;
 
+  const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    onDragMove(e.target);
+  };
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     onChange({ left: e.target.x() / PPI, top: e.target.y() / PPI });
+    onDragFinish();
   };
 
   if (field.kind === "qrCode") {
@@ -154,6 +200,7 @@ function FieldShape({ field, registerRef, onSelect, onChange }: FieldShapeProps)
         draggable
         onClick={onSelect}
         onTap={onSelect}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         onTransformEnd={(e) => {
           const node = e.target;
@@ -178,10 +225,11 @@ function FieldShape({ field, registerRef, onSelect, onChange }: FieldShapeProps)
     );
   }
 
-  // text / sessionSchedule / tickets / image — box with label for the slice.
+  // text / sessionSchedule / tickets / image — box fields.
   const w = (field.width ?? 2) * PPI;
   const h = (field.height ?? 0.3) * PPI;
   const fontSize = field.fontSize ?? 20;
+  const inverted = Boolean(field.inverted);
 
   return (
     <Group
@@ -191,6 +239,7 @@ function FieldShape({ field, registerRef, onSelect, onChange }: FieldShapeProps)
       draggable
       onClick={onSelect}
       onTap={onSelect}
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onTransformEnd={(e) => {
         const node = e.target;
@@ -207,17 +256,95 @@ function FieldShape({ field, registerRef, onSelect, onChange }: FieldShapeProps)
       width={w}
       height={h}
     >
-      <Rect width={w} height={h} stroke="#94a3b8" strokeWidth={1} dash={[4, 4]} />
+      {/* Background + border: a filled (hittable) rect so the whole box can be
+          clicked/dragged, not just the 1px outline. Symmetric, so it does not
+          need to flip when inverted. */}
+      {field.kind === "image" ? (
+        <Rect width={w} height={h} fill="#e2e8f0" stroke="#94a3b8" strokeWidth={1} />
+      ) : field.kind === "tickets" ? (
+        <Rect width={w} height={h} fill="transparent" stroke="#0f172a" strokeWidth={1} />
+      ) : (
+        <Rect
+          width={w}
+          height={h}
+          fill="transparent"
+          stroke="#94a3b8"
+          strokeWidth={1}
+          dash={[4, 4]}
+        />
+      )}
+      {/* Content flips 180° in place when inverted; the outer group keeps its
+          top-left origin so drag/transform math is unaffected. */}
+      <Group
+        x={inverted ? w : 0}
+        y={inverted ? h : 0}
+        rotation={inverted ? 180 : 0}
+        listening={false}
+      >
+        <FieldContent field={field} w={w} h={h} fontSize={fontSize} />
+      </Group>
+    </Group>
+  );
+}
+
+function FieldContent({
+  field,
+  w,
+  h,
+  fontSize,
+}: {
+  field: BadgeField;
+  w: number;
+  h: number;
+  fontSize: number;
+}) {
+  if (field.kind === "tickets") {
+    const rows = field.numRows ?? 1;
+    const rowH = h / rows;
+    return (
+      <>
+        {Array.from({ length: rows }).map((_, i) => (
+          <Group key={i}>
+            {i > 0 && (
+              <Line points={[0, rowH * i, w, rowH * i]} stroke="#0f172a" strokeWidth={1} />
+            )}
+            <Text
+              text={`Ticket ${i + 1}`}
+              x={8}
+              y={rowH * i + 6}
+              fontSize={12}
+              fill="#0f172a"
+            />
+          </Group>
+        ))}
+      </>
+    );
+  }
+
+  if (field.kind === "image") {
+    return (
       <Text
-        text={fieldDisplayText(field)}
+        text="Image"
         width={w}
         height={h}
-        align={field.textAlign === "justify" ? "left" : field.textAlign ?? "center"}
+        align="center"
         verticalAlign="middle"
-        fontSize={fontSize}
-        fill="#0f172a"
-        listening={false}
+        fontSize={14}
+        fill="#64748b"
       />
-    </Group>
+    );
+  }
+
+  // text / sessionSchedule
+  return (
+    <Text
+      text={fieldDisplayText(field)}
+      width={w}
+      height={h}
+      align={field.textAlign === "justify" ? "left" : field.textAlign ?? "center"}
+      verticalAlign="middle"
+      fontSize={fontSize}
+      fill="#0f172a"
+    />
   );
 }

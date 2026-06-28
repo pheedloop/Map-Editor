@@ -103,6 +103,8 @@ export interface BadgeBackground {
 
 export interface BadgeDocument {
   version: string;
+  /** Template name (BadgeTemplate.name). */
+  name?: string;
   /** One panel's printable size in INCHES (e.g. 3.5 × 5.5). */
   panelSize: { width: number; height: number };
   /** "none" = 1 page, "single" = 2 pages (one fold), "double" = 3 pages. */

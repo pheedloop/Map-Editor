@@ -15,6 +15,7 @@ export function BadgeEditorApp() {
       </nav>
       <div className="flex-1 overflow-hidden">
         <BadgeEditor
+          debug
           onSave={(_doc, flattened) =>
             console.log("[badge] saved", flattened.layout)
           }
