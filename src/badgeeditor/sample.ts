@@ -1,9 +1,10 @@
-// Demo content: a 2-panel "Direct Thermal" fold badge — 4 × 11" total, single
-// vertical fold (two 4 × 5.5" panels). Authored from a real exported layout:
-// the front panel holds name/org/title/tags/QR; the back panel (which prints
-// upside-down — page.inverted) holds the table number, session schedule, and an
-// external QR. Back fields are authored UPRIGHT here; the fold flatten adds the
-// 5.5" offset + inversion on Save.
+// Demo content: a 3-panel "Direct Thermal" double-fold badge — 4 × 16.5" total
+// (three 4 × 5.5" panels). Authored from a real exported layout:
+//   • Front  — name / org / title / tags / QR (upright)
+//   • Inside — table number, session schedule, external QR (prints inverted)
+//   • Back   — a 5-row tear-style tickets block (upright)
+// Inner/back fields are authored UPRIGHT here; the fold flatten applies each
+// panel's offset + inversion on Save.
 
 import { BADGE_DOCUMENT_VERSION, type BadgeDocument, type BadgeField } from "./model";
 import { createField } from "./factory";
@@ -26,13 +27,20 @@ function frontFields(): BadgeField[] {
   ];
 }
 
-/** Back-panel fields, authored upright (the page itself is inverted).
- *  Tops are panel-local (the exported tops minus the 5.5" panel offset). */
+/** Inner panel (prints inverted). Tops are panel-local (exported − 5.5"). */
+function innerFields(): BadgeField[] {
+  const off = PANEL_H;
+  return [
+    mk("table_number", { top: 6.136587866130225 - off, left: 0.6979166666666666, width: 2.6041666666666665, height: 0.25, fontSize: 24, numLines: 1, textAlign: "center" }),
+    mk("session_schedule", { top: 6.696068107981887 - off, left: 0.6979166666666655, width: 2.6041666666666674, height: 2.8544769879300276, fontSize: 20, numLines: 13, textAlign: "center" }),
+    mk("externalQRCodeUrl", { top: 9.752037425221967 - off, left: 1.609375, scale: 1 }),
+  ];
+}
+
+/** Back panel — a 5-row tickets block. Panel-local (exported − 11"). */
 function backFields(): BadgeField[] {
   return [
-    mk("table_number", { top: 6.136587866130225 - PANEL_H, left: 0.6979166666666666, width: 2.6041666666666665, height: 0.25, fontSize: 24, numLines: 1, textAlign: "center" }),
-    mk("session_schedule", { top: 6.696068107981887 - PANEL_H, left: 0.6979166666666655, width: 2.6041666666666674, height: 2.8544769879300276, fontSize: 20, numLines: 13, textAlign: "center" }),
-    mk("externalQRCodeUrl", { top: 9.752037425221967 - PANEL_H, left: 1.609375, scale: 1 }),
+    mk("tickets", { top: 11 - 2 * PANEL_H, left: 0, width: 3.9602689629864556, height: 5.523636908133685, numRows: 5 }),
   ];
 }
 
@@ -41,11 +49,12 @@ export function createSampleDocument(): BadgeDocument {
     version: BADGE_DOCUMENT_VERSION,
     name: "Direct Thermal",
     panelSize: { width: 4, height: PANEL_H },
-    fold: "single",
+    fold: "double",
     slots: "three-rect",
     pages: [
       { id: "front", role: "front", fields: frontFields() },
-      { id: "back", role: "back", inverted: true, fields: backFields() },
+      { id: "inner", role: "inner", inverted: true, fields: innerFields() },
+      { id: "back", role: "back", fields: backFields() },
     ],
   };
 }

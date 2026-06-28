@@ -11,6 +11,7 @@ import {
 import { BadgeTopBar, modKey } from "./BadgeTopBar";
 import { BadgeCanvas } from "./BadgeCanvas";
 import { BadgeSidebar } from "./BadgeSidebar";
+import { BadgePreview } from "./BadgePreview";
 import { BadgeSetupDialog, type PanelConfig } from "./BadgeSetupDialog";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { createField } from "./factory";
@@ -82,6 +83,7 @@ export function BadgeEditor({
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [showLayout, setShowLayout] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
   const clipboard = useRef<BadgeField[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -316,6 +318,17 @@ export function BadgeEditor({
     label: `${pageRoleLabel(p.role)}${pageInverts[i] ? " ⤓" : ""}`,
   }));
 
+  // Fold edges in the EDITOR view. On the flat sheet panels stack top→bottom, so
+  // a page's crease is its top edge (if a panel sits above) and/or bottom edge
+  // (if one sits below). But pages are authored upright, and an inverted
+  // (folded-back) page prints rotated 180° — which swaps its top/bottom — so its
+  // crease shows on the OPPOSITE edge in the editor.
+  const physFoldTop = pageIndex > 0;
+  const physFoldBottom = pageIndex < doc.pages.length - 1;
+  const activeInverted = pageInverts[pageIndex];
+  const foldTop = activeInverted ? physFoldBottom : physFoldTop;
+  const foldBottom = activeInverted ? physFoldTop : physFoldBottom;
+
   const editMenu: MenuEntry[] = [
     {
       label: "Undo",
@@ -369,7 +382,7 @@ export function BadgeEditor({
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           {/* OptionsBar strip: page tabs (folded badges) + Badge Setup */}
           <div className="flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
-            {doc.pages.length > 1 && (
+            {!previewMode && doc.pages.length > 1 && (
               <TabBar
                 tabs={pageTabs}
                 value={String(pageIndex)}
@@ -377,7 +390,7 @@ export function BadgeEditor({
                 itemClassName="px-3 py-1.5 text-xs"
               />
             )}
-            {pageInverts[pageIndex] && (
+            {!previewMode && pageInverts[pageIndex] && (
               <span
                 className="text-[11px] text-amber-600"
                 title="This panel prints upside-down"
@@ -385,33 +398,53 @@ export function BadgeEditor({
                 ⤓ prints upside-down automatically
               </span>
             )}
+            {previewMode && (
+              <span className="text-xs text-gray-500">
+                Full preview · as printed (read-only)
+              </span>
+            )}
+            <div className="flex-1" />
+            <Button
+              variant={previewMode ? "solid" : "outline"}
+              color="neutral"
+              size="sm"
+              onClick={() => setPreviewMode((p) => !p)}
+            >
+              {previewMode ? "Exit preview" : "Full preview"}
+            </Button>
           </div>
 
-          <div
-            ref={containerRef}
-            className="flex-1 min-h-0 overflow-hidden bg-gray-100"
-          >
-            <BadgeCanvas
-              page={activePage}
-              panelSize={doc.panelSize}
-              slots={doc.slots ?? "none"}
-              isFrontPage={pageIndex === 0}
-              foldTop={pageIndex > 0}
-              foldBottom={pageIndex < doc.pages.length - 1}
-              selectedIds={selectedIds}
-              onFieldMouseDown={selectField}
-              onClearSelection={clearSelection}
-              onMarqueeSelect={marqueeSelect}
-              onChangeField={updateField}
-              onMoveMany={moveMany}
-              scale={controls.scale}
-              position={controls.position}
-              stageSize={controls.stageSize}
-              stageRef={controls.stageRef}
-              onWheel={controls.handleWheel}
-              onPositionChange={controls.setPosition}
-            />
-          </div>
+          {previewMode ? (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <BadgePreview doc={doc} />
+            </div>
+          ) : (
+            <div
+              ref={containerRef}
+              className="flex-1 min-h-0 overflow-hidden bg-gray-100"
+            >
+              <BadgeCanvas
+                page={activePage}
+                panelSize={doc.panelSize}
+                slots={doc.slots ?? "none"}
+                isFrontPage={pageIndex === 0}
+                foldTop={foldTop}
+                foldBottom={foldBottom}
+                selectedIds={selectedIds}
+                onFieldMouseDown={selectField}
+                onClearSelection={clearSelection}
+                onMarqueeSelect={marqueeSelect}
+                onChangeField={updateField}
+                onMoveMany={moveMany}
+                scale={controls.scale}
+                position={controls.position}
+                stageSize={controls.stageSize}
+                stageRef={controls.stageRef}
+                onWheel={controls.handleWheel}
+                onPositionChange={controls.setPosition}
+              />
+            </div>
+          )}
           {/* Footer — page + overall badge size, and zoom (mirrors StatusBar) */}
           <div className="relative z-20 flex items-center justify-between px-3 py-1.5 bg-white border-t border-gray-200 text-xs text-gray-500">
             <div className="flex items-center gap-2">
@@ -445,7 +478,7 @@ export function BadgeEditor({
               {JSON.stringify(flattened.layout, null, 2)}
             </pre>
           </aside>
-        ) : selectedIds.size > 1 ? (
+        ) : previewMode ? null : selectedIds.size > 1 ? (
           <aside className="w-60 shrink-0 border-l border-gray-200 bg-white flex flex-col">
             <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
               <span className="text-xs font-medium text-gray-600">
