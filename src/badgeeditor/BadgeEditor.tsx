@@ -13,10 +13,12 @@ import { BadgeCanvas } from "./BadgeCanvas";
 import { BadgeSidebar } from "./BadgeSidebar";
 import { BadgePreview } from "./BadgePreview";
 import { BadgeSetupDialog, type PanelConfig } from "./BadgeSetupDialog";
+import { AttendeePicker } from "./AttendeePicker";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { createField } from "./factory";
 import { flatten, foldInvertForPage } from "./serialize";
 import { createSampleDocument } from "./sample";
+import type { AttendeeOption, AttendeeProvider, BadgeData } from "./badgeData";
 import {
   PAGE_COUNT,
   pageRoleForIndex,
@@ -36,6 +38,9 @@ export interface BadgeEditorProps {
   onSave?: (doc: BadgeDocument, flattened: FlattenResult) => void;
   /** Show the debug affordance (badge_layout JSON viewer). */
   debug?: boolean;
+  /** Supplies attendee search + badge-data resolution for the live preview.
+   *  When omitted, the picker is hidden and fields show placeholders. */
+  attendeeProvider?: AttendeeProvider;
 }
 
 /** Inches → compact string (trims trailing zeros): 4, 5.5, 2.85. */
@@ -66,6 +71,7 @@ export function BadgeEditor({
   initialDocument,
   onSave,
   debug,
+  attendeeProvider,
 }: BadgeEditorProps) {
   const [initial] = useState<BadgeDocument>(
     () => initialDocument ?? createSampleDocument(),
@@ -84,7 +90,27 @@ export function BadgeEditor({
   const [showLayout, setShowLayout] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [previewAttendee, setPreviewAttendee] = useState<AttendeeOption | null>(
+    null,
+  );
+  const [previewData, setPreviewData] = useState<BadgeData | null>(null);
   const clipboard = useRef<BadgeField[]>([]);
+
+  // Resolve the selected attendee's badge data (or clear it).
+  const selectAttendee = useCallback(
+    (option: AttendeeOption | null) => {
+      setPreviewAttendee(option);
+      if (!option || !attendeeProvider) {
+        setPreviewData(null);
+        return;
+      }
+      attendeeProvider
+        .resolve(option.id)
+        .then((d) => setPreviewData(d))
+        .catch(() => setPreviewData(null));
+    },
+    [attendeeProvider],
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
   const controls = useCanvasControls(containerRef);
@@ -379,9 +405,12 @@ export function BadgeEditor({
           onAddField={addField}
         />
 
+        {/* Main column — OptionsBar on top, [canvas | properties] below, so the
+            sidebar and OptionsBar sit side by side (like the map editor). */}
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          {/* OptionsBar strip: page tabs (folded badges) + Badge Setup */}
-          <div className="flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
+          {/* OptionsBar — z-20 so the attendee-picker dropdown layers above the
+              properties panel below it. */}
+          <div className="relative z-20 flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
             {!previewMode && doc.pages.length > 1 && (
               <TabBar
                 tabs={pageTabs}
@@ -390,20 +419,19 @@ export function BadgeEditor({
                 itemClassName="px-3 py-1.5 text-xs"
               />
             )}
-            {!previewMode && pageInverts[pageIndex] && (
-              <span
-                className="text-[11px] text-amber-600"
-                title="This panel prints upside-down"
-              >
-                ⤓ prints upside-down automatically
-              </span>
-            )}
             {previewMode && (
               <span className="text-xs text-gray-500">
                 Full preview · as printed (read-only)
               </span>
             )}
             <div className="flex-1" />
+            {attendeeProvider && (
+              <AttendeePicker
+                provider={attendeeProvider}
+                value={previewAttendee}
+                onChange={selectAttendee}
+              />
+            )}
             <Button
               variant={previewMode ? "solid" : "outline"}
               color="neutral"
@@ -414,9 +442,19 @@ export function BadgeEditor({
             </Button>
           </div>
 
+          {/* Inner row — canvas + properties, below the OptionsBar */}
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-col flex-1 min-w-0 min-h-0">
+          {/* Invert ribbon — contextual to the active folded-back panel. */}
+          {!previewMode && pageInverts[pageIndex] && (
+            <div className="shrink-0 bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-xs text-amber-700">
+              ⤓ This panel prints upside-down automatically.
+            </div>
+          )}
+
           {previewMode ? (
             <div className="flex-1 min-h-0 overflow-hidden">
-              <BadgePreview doc={doc} />
+              <BadgePreview doc={doc} data={previewData} />
             </div>
           ) : (
             <div
@@ -426,6 +464,7 @@ export function BadgeEditor({
               <BadgeCanvas
                 page={activePage}
                 panelSize={doc.panelSize}
+                data={previewData}
                 slots={doc.slots ?? "none"}
                 isFrontPage={pageIndex === 0}
                 foldTop={foldTop}
@@ -479,7 +518,7 @@ export function BadgeEditor({
             </pre>
           </aside>
         ) : previewMode ? null : selectedIds.size > 1 ? (
-          <aside className="w-60 shrink-0 border-l border-gray-200 bg-white flex flex-col">
+          <aside className="w-52 shrink-0 border-l border-gray-200 bg-white flex flex-col">
             <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
               <span className="text-xs font-medium text-gray-600">
                 {selectedIds.size} fields selected
@@ -507,6 +546,8 @@ export function BadgeEditor({
             onDelete={deleteSelected}
           />
         )}
+          </div>
+        </div>
       </div>
 
       {showSetup && (

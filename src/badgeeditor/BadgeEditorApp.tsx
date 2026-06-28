@@ -1,5 +1,6 @@
 import { ProductSwitcher } from "../components/ProductSwitcher";
 import { BadgeEditor } from "./BadgeEditor";
+import { sampleAttendeeProvider } from "./sample-attendees";
 
 /**
  * Badge product shell (demo). Mirrors SeatplannerApp — only an editor mode for
@@ -16,6 +17,7 @@ export function BadgeEditorApp() {
       <div className="flex-1 overflow-hidden">
         <BadgeEditor
           debug
+          attendeeProvider={sampleAttendeeProvider}
           onSave={(_doc, flattened) =>
             console.log("[badge] saved", flattened.layout)
           }

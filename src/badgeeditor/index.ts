@@ -8,6 +8,14 @@ export type {
   BadgePage,
   BadgeField,
   FoldType,
+  SlotType,
   FlattenResult,
   LegacyLayoutEntry,
 } from "./model";
+export type {
+  BadgeData,
+  AttendeeOption,
+  AttendeeProvider,
+  BadgeTicketData,
+  BadgeSessionData,
+} from "./badgeData";

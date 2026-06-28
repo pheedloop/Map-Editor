@@ -1,14 +1,9 @@
 import { useRef } from "react";
 import { Stage, Layer, Rect, Group, Line } from "react-konva";
 import { useCanvasControls } from "../editor/hooks/useCanvasControls";
-import {
-  StaticField,
-  Slots,
-  useQrImage,
-  PPI,
-  PANEL_CORNER_IN,
-} from "./BadgeCanvas";
+import { StaticField, Slots, PPI, PANEL_CORNER_IN } from "./BadgeCanvas";
 import { foldInvertForPage } from "./serialize";
+import type { BadgeData } from "./badgeData";
 import type { BadgeDocument } from "./model";
 
 /**
@@ -17,10 +12,15 @@ import type { BadgeDocument } from "./model";
  * 180° rotation, composed with any field-level inversion). Pan with drag, zoom
  * with the wheel. No editing.
  */
-export function BadgePreview({ doc }: { doc: BadgeDocument }) {
+export function BadgePreview({
+  doc,
+  data,
+}: {
+  doc: BadgeDocument;
+  data: BadgeData | null;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const c = useCanvasControls(containerRef);
-  const qrImage = useQrImage();
 
   const panelW = doc.panelSize.width * PPI;
   const panelH = doc.panelSize.height * PPI;
@@ -76,7 +76,7 @@ export function BadgePreview({ doc }: { doc: BadgeDocument }) {
                   rotation={inverted ? 180 : 0}
                 >
                   {page.fields.map((f) => (
-                    <StaticField key={f.id} field={f} qrImage={qrImage} />
+                    <StaticField key={f.id} field={f} data={data} />
                   ))}
                   {stubs > 1 &&
                     Array.from({ length: stubs - 1 }).map((_, k) => {

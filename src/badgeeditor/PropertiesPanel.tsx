@@ -43,10 +43,14 @@ interface PropertiesPanelProps {
   onDelete: () => void;
 }
 
-export function PropertiesPanel({ field, onChange, onDelete }: PropertiesPanelProps) {
+export function PropertiesPanel({
+  field,
+  onChange,
+  onDelete,
+}: PropertiesPanelProps) {
   if (!field) {
     return (
-      <div className="w-60 shrink-0 border-l border-gray-200 bg-white flex flex-col">
+      <div className="w-48 shrink-0 border-l border-gray-200 bg-white flex flex-col">
         <div className="flex-1 flex items-center justify-center p-6 text-center">
           <span className="text-xs text-gray-400">
             Select a field to edit its properties.
@@ -68,9 +72,11 @@ export function PropertiesPanel({ field, onChange, onDelete }: PropertiesPanelPr
   };
 
   return (
-    <div className="w-60 shrink-0 border-l border-gray-200 bg-white flex flex-col">
+    <div className="w-52 shrink-0 border-l border-gray-200 bg-white flex flex-col">
       <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-600 truncate">{label}</span>
+        <span className="text-xs font-medium text-gray-600 truncate">
+          {label}
+        </span>
         <IconButton size="sm" onClick={onDelete} title="Delete field">
           <PiTrash size={15} />
         </IconButton>

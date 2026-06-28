@@ -33,11 +33,15 @@ interface BadgeSidebarProps {
  * by a list of "tool" rows. For badges the rows are the field palette; clicking
  * one adds that field to the canvas.
  */
-export function BadgeSidebar({ name, onNameChange, onAddField }: BadgeSidebarProps) {
+export function BadgeSidebar({
+  name,
+  onNameChange,
+  onAddField,
+}: BadgeSidebarProps) {
   const fields = FIELD_DEFS.filter((d) => d.inPalette !== false);
 
   return (
-    <div className="flex flex-col w-64 shrink-0 bg-white border-r border-gray-200 overflow-hidden">
+    <div className="flex flex-col w-48 shrink-0 bg-white border-r border-gray-200 overflow-hidden">
       <SidebarHeader name={name} onNameChange={onNameChange} />
       <div className="flex-1 overflow-y-auto py-2 px-1">
         <div className="px-2 pb-1">
@@ -91,7 +95,7 @@ function SidebarHeader({
   };
 
   return (
-    <div className="px-3 py-3 border-b border-gray-100 flex items-center gap-2 min-w-0">
+    <div className="px-3 h-[43px] shrink-0 border-b border-gray-200 flex items-center gap-2 min-w-0">
       {editing ? (
         <input
           ref={inputRef}
