@@ -18,7 +18,7 @@ import { fieldSizePx, useBadgeGuides } from "./useBadgeGuides";
 import qrCodeUrl from "./qr-code.png";
 
 /** Load the stand-in QR image once (shared across all QR fields). */
-function useQrImage(): HTMLImageElement | null {
+export function useQrImage(): HTMLImageElement | null {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   useEffect(() => {
     const im = new window.Image();
@@ -30,9 +30,9 @@ function useQrImage(): HTMLImageElement | null {
 
 // Canvas renders at 96px per inch (the legacy DPI); zoom is layered on top via
 // useCanvasControls' `scale`.
-const PPI = DPI;
+export const PPI = DPI;
 const QR_BASE_PX = 75;
-const PANEL_CORNER_IN = 0.25; // corner fillet
+export const PANEL_CORNER_IN = 0.25; // corner fillet
 
 // ---------------------------------------------------------------------------
 // Lanyard slot geometry — all values in INCHES. Tweak freely to match physical
@@ -524,54 +524,79 @@ function FieldShape({
     onDragFinish();
   };
 
-  if (field.kind === "qrCode") {
-    const size = QR_BASE_PX * (field.scale ?? 1);
-    return (
-      <Group
-        ref={registerRef}
-        x={x}
-        y={y}
-        width={size}
-        height={size}
-        draggable={!panMode}
-        onMouseDown={handleMouseDown}
-        onDragStart={onDragStart}
-        onDragMove={(e) => onDragMove(e.target)}
-        onDragEnd={handleDragEnd}
-        onTransformEnd={(e) => {
-          const node = e.target;
+  const { w, h } = fieldSizePx(field);
+  const isQrField = field.kind === "qrCode";
+
+  return (
+    <Group
+      ref={registerRef}
+      x={x}
+      y={y}
+      width={w}
+      height={h}
+      draggable={!panMode}
+      onMouseDown={handleMouseDown}
+      onDragStart={onDragStart}
+      onDragMove={(e) => onDragMove(e.target)}
+      onDragEnd={handleDragEnd}
+      onTransformEnd={(e) => {
+        const node = e.target;
+        if (isQrField) {
           const newSize = node.width() * node.scaleX();
           node.scaleX(1);
           node.scaleY(1);
           onChange({ scale: newSize / QR_BASE_PX });
-        }}
-      >
-        {qrImage ? (
-          <>
-            <Rect width={size} height={size} fill="#ffffff" />
-            <KonvaImage
-              image={qrImage}
-              width={size}
-              height={size}
-              listening={false}
-            />
-          </>
-        ) : (
-          <>
-            <Rect width={size} height={size} fill="#0f172a" cornerRadius={2} />
-            <Text
-              text="QR"
-              width={size}
-              height={size}
-              align="center"
-              verticalAlign="middle"
-              fill="#ffffff"
-              fontSize={Math.max(10, size * 0.25)}
-              listening={false}
-            />
-          </>
-        )}
-      </Group>
+        } else {
+          const newW = node.width() * node.scaleX();
+          const newH = node.height() * node.scaleY();
+          node.scaleX(1);
+          node.scaleY(1);
+          onChange({
+            width: newW / PPI,
+            height: newH / PPI,
+            numLines: Math.max(1, Math.floor(newH / (field.fontSize ?? 20))),
+          });
+        }
+      }}
+    >
+      <FieldBody field={field} qrImage={qrImage} />
+    </Group>
+  );
+}
+
+/**
+ * The visual contents of a field (no interaction), shared by the editor's
+ * interactive FieldShape and the read-only StaticField used in Full Preview.
+ * Rendered at the group origin; includes the field-level 180° inversion.
+ */
+function FieldBody({
+  field,
+  qrImage,
+}: {
+  field: BadgeField;
+  qrImage: HTMLImageElement | null;
+}) {
+  if (field.kind === "qrCode") {
+    const size = QR_BASE_PX * (field.scale ?? 1);
+    return qrImage ? (
+      <>
+        <Rect width={size} height={size} fill="#ffffff" />
+        <KonvaImage image={qrImage} width={size} height={size} listening={false} />
+      </>
+    ) : (
+      <>
+        <Rect width={size} height={size} fill="#0f172a" cornerRadius={2} />
+        <Text
+          text="QR"
+          width={size}
+          height={size}
+          align="center"
+          verticalAlign="middle"
+          fill="#ffffff"
+          fontSize={Math.max(10, size * 0.25)}
+          listening={false}
+        />
+      </>
     );
   }
 
@@ -581,55 +606,13 @@ function FieldShape({
   const inverted = Boolean(field.inverted);
 
   return (
-    <Group
-      ref={registerRef}
-      x={x}
-      y={y}
-      draggable={!panMode}
-      onMouseDown={handleMouseDown}
-      onDragStart={onDragStart}
-      onDragMove={(e) => onDragMove(e.target)}
-      onDragEnd={handleDragEnd}
-      onTransformEnd={(e) => {
-        const node = e.target;
-        const newW = node.width() * node.scaleX();
-        const newH = node.height() * node.scaleY();
-        node.scaleX(1);
-        node.scaleY(1);
-        onChange({
-          width: newW / PPI,
-          height: newH / PPI,
-          numLines: Math.max(1, Math.floor(newH / fontSize)),
-        });
-      }}
-      width={w}
-      height={h}
-    >
+    <>
       {field.kind === "image" ? (
-        <Rect
-          width={w}
-          height={h}
-          fill="#e2e8f0"
-          stroke="#94a3b8"
-          strokeWidth={1}
-        />
+        <Rect width={w} height={h} fill="#e2e8f0" stroke="#94a3b8" strokeWidth={1} />
       ) : field.kind === "tickets" ? (
-        <Rect
-          width={w}
-          height={h}
-          fill="transparent"
-          stroke="#0f172a"
-          strokeWidth={1}
-        />
+        <Rect width={w} height={h} fill="transparent" stroke="#0f172a" strokeWidth={1} />
       ) : (
-        <Rect
-          width={w}
-          height={h}
-          fill="transparent"
-          stroke="#94a3b8"
-          strokeWidth={1}
-          dash={[4, 4]}
-        />
+        <Rect width={w} height={h} fill="transparent" stroke="#94a3b8" strokeWidth={1} dash={[4, 4]} />
       )}
       <Group
         x={inverted ? w : 0}
@@ -639,12 +622,28 @@ function FieldShape({
       >
         <FieldContent field={field} w={w} h={h} fontSize={fontSize} />
       </Group>
+    </>
+  );
+}
+
+/** Read-only positioned field visual for the full-preview render. */
+export function StaticField({
+  field,
+  qrImage,
+}: {
+  field: BadgeField;
+  qrImage: HTMLImageElement | null;
+}) {
+  const { w, h } = fieldSizePx(field);
+  return (
+    <Group x={field.left * PPI} y={field.top * PPI} width={w} height={h} listening={false}>
+      <FieldBody field={field} qrImage={qrImage} />
     </Group>
   );
 }
 
 /** Static lanyard hole-punch slots near the top of the front panel. */
-function Slots({ slots, panelW }: { slots: SlotType; panelW: number }) {
+export function Slots({ slots, panelW }: { slots: SlotType; panelW: number }) {
   const fill = "#f1f5f9";
   const stroke = "#94a3b8";
 
