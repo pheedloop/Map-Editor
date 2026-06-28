@@ -18,11 +18,7 @@ import { PropertiesPanel } from "./PropertiesPanel";
 import { createField } from "./factory";
 import { flatten, foldInvertForPage } from "./serialize";
 import { createSampleDocument } from "./sample";
-import type {
-  AttendeeOption,
-  AttendeeProvider,
-  BadgeData,
-} from "./badgeData";
+import type { AttendeeOption, AttendeeProvider, BadgeData } from "./badgeData";
 import {
   PAGE_COUNT,
   pageRoleForIndex,
@@ -94,7 +90,9 @@ export function BadgeEditor({
   const [showLayout, setShowLayout] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
-  const [previewAttendee, setPreviewAttendee] = useState<AttendeeOption | null>(null);
+  const [previewAttendee, setPreviewAttendee] = useState<AttendeeOption | null>(
+    null,
+  );
   const [previewData, setPreviewData] = useState<BadgeData | null>(null);
   const clipboard = useRef<BadgeField[]>([]);
 
@@ -407,9 +405,12 @@ export function BadgeEditor({
           onAddField={addField}
         />
 
+        {/* Main column — OptionsBar on top, [canvas | properties] below, so the
+            sidebar and OptionsBar sit side by side (like the map editor). */}
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          {/* OptionsBar strip: page tabs (folded badges) + Badge Setup */}
-          <div className="flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
+          {/* OptionsBar — z-20 so the attendee-picker dropdown layers above the
+              properties panel below it. */}
+          <div className="relative z-20 flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
             {!previewMode && doc.pages.length > 1 && (
               <TabBar
                 tabs={pageTabs}
@@ -417,14 +418,6 @@ export function BadgeEditor({
                 onChange={(id) => selectPage(Number(id))}
                 itemClassName="px-3 py-1.5 text-xs"
               />
-            )}
-            {!previewMode && pageInverts[pageIndex] && (
-              <span
-                className="text-[11px] text-amber-600"
-                title="This panel prints upside-down"
-              >
-                ⤓ prints upside-down automatically
-              </span>
             )}
             {previewMode && (
               <span className="text-xs text-gray-500">
@@ -448,6 +441,16 @@ export function BadgeEditor({
               {previewMode ? "Exit preview" : "Full preview"}
             </Button>
           </div>
+
+          {/* Inner row — canvas + properties, below the OptionsBar */}
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-col flex-1 min-w-0 min-h-0">
+          {/* Invert ribbon — contextual to the active folded-back panel. */}
+          {!previewMode && pageInverts[pageIndex] && (
+            <div className="shrink-0 bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-xs text-amber-700">
+              ⤓ This panel prints upside-down automatically.
+            </div>
+          )}
 
           {previewMode ? (
             <div className="flex-1 min-h-0 overflow-hidden">
@@ -515,7 +518,7 @@ export function BadgeEditor({
             </pre>
           </aside>
         ) : previewMode ? null : selectedIds.size > 1 ? (
-          <aside className="w-60 shrink-0 border-l border-gray-200 bg-white flex flex-col">
+          <aside className="w-52 shrink-0 border-l border-gray-200 bg-white flex flex-col">
             <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
               <span className="text-xs font-medium text-gray-600">
                 {selectedIds.size} fields selected
@@ -543,6 +546,8 @@ export function BadgeEditor({
             onDelete={deleteSelected}
           />
         )}
+          </div>
+        </div>
       </div>
 
       {showSetup && (
