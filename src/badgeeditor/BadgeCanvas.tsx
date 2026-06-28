@@ -620,7 +620,7 @@ function FieldBody({
         rotation={inverted ? 180 : 0}
         listening={false}
       >
-        <FieldContent field={field} w={w} h={h} fontSize={fontSize} />
+        <FieldContent field={field} w={w} h={h} fontSize={fontSize} qrImage={qrImage} />
       </Group>
     </>
   );
@@ -757,40 +757,74 @@ function FoldIndicators({
   );
 }
 
+// Generic placeholder — the real name comes from the attendee's purchase at
+// print time (badge_generator.py _render_tickets).
+const TICKET_NAME_PLACEHOLDER = "Ticket Name";
+
 function FieldContent({
   field,
   w,
   h,
   fontSize,
+  qrImage,
 }: {
   field: BadgeField;
   w: number;
   h: number;
   fontSize: number;
+  qrImage: HTMLImageElement | null;
 }) {
   if (field.kind === "tickets") {
     const rows = field.numRows ?? 1;
     const rowH = h / rows;
+    // Each row mirrors a printed ticket: a QR (~80% of row height) + the ticket
+    // name, like badge_generator.py _render_tickets.
+    const pad = rowH * 0.12;
+    const qrSize = Math.max(0, rowH - pad * 2);
+    const nameX = pad + qrSize + rowH * 0.18;
+    const nameFont = Math.min(14, Math.max(7, rowH * 0.3));
     return (
       <>
-        {Array.from({ length: rows }).map((_, i) => (
-          <Group key={i}>
-            {i > 0 && (
-              <Line
-                points={[0, rowH * i, w, rowH * i]}
-                stroke="#0f172a"
-                strokeWidth={1}
+        {Array.from({ length: rows }).map((_, i) => {
+          const top = rowH * i;
+          return (
+            <Group key={i}>
+              {i > 0 && (
+                <Line points={[0, top, w, top]} stroke="#cbd5e1" strokeWidth={1} />
+              )}
+              {qrImage ? (
+                <KonvaImage
+                  image={qrImage}
+                  x={pad}
+                  y={top + pad}
+                  width={qrSize}
+                  height={qrSize}
+                  listening={false}
+                />
+              ) : (
+                <Rect
+                  x={pad}
+                  y={top + pad}
+                  width={qrSize}
+                  height={qrSize}
+                  fill="#0f172a"
+                  cornerRadius={2}
+                />
+              )}
+              <Text
+                text={TICKET_NAME_PLACEHOLDER}
+                x={nameX}
+                y={top}
+                width={Math.max(0, w - nameX - pad)}
+                height={rowH}
+                verticalAlign="middle"
+                fontSize={nameFont}
+                fontStyle="bold"
+                fill="#0f172a"
               />
-            )}
-            <Text
-              text={`Ticket ${i + 1}`}
-              x={8}
-              y={rowH * i + 6}
-              fontSize={12}
-              fill="#0f172a"
-            />
-          </Group>
-        ))}
+            </Group>
+          );
+        })}
       </>
     );
   }
