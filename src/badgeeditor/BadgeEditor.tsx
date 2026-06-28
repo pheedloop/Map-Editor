@@ -3,15 +3,24 @@ import { v4 as uuid } from "uuid";
 import { useCanvasControls } from "../editor/hooks/useCanvasControls";
 import { useHistory } from "../editor/hooks/useHistory";
 import { StatusBar } from "../editor/components/StatusBar";
-import type { MenuEntry } from "../editor/components/ui";
+import { Button, TabBar, type MenuEntry } from "../editor/components/ui";
 import { BadgeTopBar, modKey } from "./BadgeTopBar";
 import { BadgeCanvas } from "./BadgeCanvas";
 import { BadgeSidebar } from "./BadgeSidebar";
+import { BadgeSetupDialog } from "./BadgeSetupDialog";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { createField } from "./factory";
-import { flatten } from "./serialize";
+import { flatten, foldInvertForPage } from "./serialize";
 import { createSampleDocument } from "./sample";
-import type { BadgeDocument, BadgeField, FlattenResult } from "./model";
+import {
+  PAGE_COUNT,
+  pageRoleForIndex,
+  pageRoleLabel,
+  type BadgeDocument,
+  type BadgeField,
+  type FlattenResult,
+  type FoldType,
+} from "./model";
 
 export interface BadgeEditorProps {
   /** Initial document. Defaults to a sample card if omitted. */
@@ -32,11 +41,12 @@ function isEditableTarget(t: EventTarget | null): boolean {
 }
 
 /**
- * Single-page badge editor. Shares the map/seatplan editor chrome (TopBar,
- * ToolSidebar-style left panel, StatusBar, ui kit) so it feels like the same
+ * Badge editor. Shares the map/seatplan editor chrome (TopBar, ToolSidebar-style
+ * left panel, OptionsBar strip, StatusBar, ui kit) so it feels like the same
  * tool. Add / select / drag / resize all field kinds, edit via the properties
- * panel, with undo/redo, alignment-guide snapping, and clipboard.
- * Save → flatten() to the legacy badge_layout. Multi-page/fold comes later.
+ * panel, with undo/redo, alignment-guide snapping, and clipboard. Supports
+ * multi-page folded badges (front/back/inside) that flatten to the legacy
+ * badge_layout on Save.
  */
 export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps) {
   const [initial] = useState<BadgeDocument>(
@@ -52,17 +62,28 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
   } = useHistory<BadgeDocument>(initial);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activePageIndex, setActivePageIndex] = useState(0);
   const [showLayout, setShowLayout] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
   const clipboard = useRef<BadgeField | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const controls = useCanvasControls(containerRef);
 
+  // Active page (clamped — fold changes can shrink the page count).
+  const pageIndex = Math.min(activePageIndex, doc.pages.length - 1);
+  const activePage = doc.pages[pageIndex];
+
   const selectedField =
-    doc.pages[0].fields.find((f) => f.id === selectedId) ?? null;
+    activePage.fields.find((f) => f.id === selectedId) ?? null;
   const flattened = useMemo(() => flatten(doc), [doc]);
 
-  // --- Mutations (single front page) ---
+  const selectPage = useCallback((i: number) => {
+    setActivePageIndex(i);
+    setSelectedId(null);
+  }, []);
+
+  // --- Mutations (target the active page) ---
 
   const setName = useCallback(
     (name: string) => setDoc((d) => ({ ...d, name })),
@@ -75,12 +96,12 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
       setDoc((d) => ({
         ...d,
         pages: d.pages.map((p, i) =>
-          i === 0 ? { ...p, fields: [...p.fields, field] } : p,
+          i === pageIndex ? { ...p, fields: [...p.fields, field] } : p,
         ),
       }));
       setSelectedId(field.id);
     },
-    [setDoc],
+    [setDoc, pageIndex],
   );
 
   const updateField = useCallback(
@@ -88,7 +109,7 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
       setDoc((d) => ({
         ...d,
         pages: d.pages.map((p, i) =>
-          i === 0
+          i === pageIndex
             ? {
                 ...p,
                 fields: p.fields.map((f) => (f.id === id ? { ...f, ...patch } : f)),
@@ -97,7 +118,7 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
         ),
       }));
     },
-    [setDoc],
+    [setDoc, pageIndex],
   );
 
   const deleteField = useCallback(
@@ -105,12 +126,12 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
       setDoc((d) => ({
         ...d,
         pages: d.pages.map((p, i) =>
-          i === 0 ? { ...p, fields: p.fields.filter((f) => f.id !== id) } : p,
+          i === pageIndex ? { ...p, fields: p.fields.filter((f) => f.id !== id) } : p,
         ),
       }));
       setSelectedId((cur) => (cur === id ? null : cur));
     },
-    [setDoc],
+    [setDoc, pageIndex],
   );
 
   const copySelected = useCallback(() => {
@@ -129,11 +150,37 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
     setDoc((d) => ({
       ...d,
       pages: d.pages.map((p, i) =>
-        i === 0 ? { ...p, fields: [...p.fields, field] } : p,
+        i === pageIndex ? { ...p, fields: [...p.fields, field] } : p,
       ),
     }));
     setSelectedId(field.id);
-  }, [setDoc]);
+  }, [setDoc, pageIndex]);
+
+  // Apply fold/panel-size changes: rebuild the pages array, preserving existing
+  // pages' fields and applying the per-panel invert overrides from the dialog.
+  const applySetup = useCallback(
+    (
+      fold: FoldType,
+      panelSize: { width: number; height: number },
+      inverts: boolean[],
+    ) => {
+      setDoc((d) => {
+        const count = PAGE_COUNT[fold];
+        const pages = Array.from({ length: count }, (_, i) => {
+          const role = pageRoleForIndex(count, i);
+          const inverted = inverts[i] ?? foldInvertForPage(fold, i);
+          const existing = d.pages[i];
+          return existing
+            ? { ...existing, role, inverted }
+            : { id: uuid(), role, fields: [], inverted };
+        });
+        return { ...d, fold, panelSize, pages };
+      });
+      setActivePageIndex((idx) => Math.min(idx, PAGE_COUNT[fold] - 1));
+      setSelectedId(null);
+    },
+    [setDoc],
+  );
 
   const handleSave = useCallback(() => {
     onSave?.(doc, flatten(doc));
@@ -184,6 +231,8 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
   };
 
   const fileMenu: MenuEntry[] = [
+    { label: "Badge Setup…", onClick: () => setShowSetup(true) },
+    { type: "divider" },
     ...(onSave
       ? [
           { label: "Save", shortcut: `${modKey}S`, onClick: handleSave },
@@ -192,6 +241,15 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
       : []),
     { label: "Export as JSON", onClick: exportJson },
   ];
+
+  // Page tabs (front/back/inside) + per-page invert state.
+  const pageInverts = doc.pages.map(
+    (p, i) => p.inverted ?? foldInvertForPage(doc.fold, i),
+  );
+  const pageTabs = doc.pages.map((p, i) => ({
+    id: String(i),
+    label: `${pageRoleLabel(p.role)}${pageInverts[i] ? " ⤓" : ""}`,
+  }));
 
   const editMenu: MenuEntry[] = [
     { label: "Undo", shortcut: `${modKey}Z`, disabled: !canUndo, onClick: undo },
@@ -234,12 +292,38 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
         />
 
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
+          {/* OptionsBar strip: page tabs (folded badges) + Badge Setup */}
+          <div className="flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
+            {doc.pages.length > 1 && (
+              <TabBar
+                tabs={pageTabs}
+                value={String(pageIndex)}
+                onChange={(id) => selectPage(Number(id))}
+                itemClassName="px-3 py-1.5 text-xs"
+              />
+            )}
+            {pageInverts[pageIndex] && (
+              <span className="text-[11px] text-amber-600" title="This panel prints upside-down">
+                ⤓ prints upside-down
+              </span>
+            )}
+            <div className="flex-1" />
+            <Button
+              variant="outline"
+              color="neutral"
+              size="sm"
+              onClick={() => setShowSetup(true)}
+            >
+              Badge Setup…
+            </Button>
+          </div>
+
           <div
             ref={containerRef}
             className="flex-1 min-h-0 overflow-hidden bg-gray-100"
           >
             <BadgeCanvas
-              page={doc.pages[0]}
+              page={activePage}
               panelSize={doc.panelSize}
               selectedId={selectedId}
               onSelect={setSelectedId}
@@ -279,6 +363,16 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
           />
         )}
       </div>
+
+      {showSetup && (
+        <BadgeSetupDialog
+          fold={doc.fold}
+          panelSize={doc.panelSize}
+          pages={doc.pages}
+          onApply={applySetup}
+          onClose={() => setShowSetup(false)}
+        />
+      )}
     </div>
   );
 }

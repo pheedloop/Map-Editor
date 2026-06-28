@@ -76,6 +76,76 @@ for (const [name, original] of Object.entries(FIXTURES)) {
   }
 }
 
+// --- Fold flatten check: 2-panel single fold ---------------------------------
+{
+  const PANEL_H = 5.5;
+  const doc = {
+    version: "1.0",
+    panelSize: { width: 3.64, height: PANEL_H },
+    fold: "single" as const,
+    pages: [
+      {
+        id: "front",
+        role: "front" as const,
+        fields: [
+          {
+            id: "f1",
+            field: "first_name",
+            kind: "text" as const,
+            top: 0.3,
+            left: 0.5,
+            width: 2.6,
+            height: 0.3,
+            fontSize: 30,
+            numLines: 1,
+            textAlign: "center" as const,
+          },
+        ],
+      },
+      {
+        id: "back",
+        role: "back" as const,
+        // page.inverted undefined -> default for single fold, index 1 = true
+        fields: [
+          {
+            id: "b1",
+            field: "last_name",
+            kind: "text" as const,
+            top: 0.3,
+            left: 0.5,
+            width: 2.6,
+            height: 0.3,
+            fontSize: 30,
+            numLines: 1,
+            textAlign: "center" as const,
+          },
+        ],
+      },
+    ],
+  };
+
+  const { layout, width, height } = flatten(doc);
+  const errs: string[] = [];
+  if (width !== 3.64) errs.push(`fold width ${width} != 3.64`);
+  if (height !== PANEL_H * 2) errs.push(`fold height ${height} != ${PANEL_H * 2}`);
+  // Front panel: unchanged, upright.
+  if (Math.abs(layout[0].top - 0.3) > EPS) errs.push(`front top ${layout[0].top} != 0.3`);
+  if (layout[0].inverted !== false) errs.push(`front inverted ${layout[0].inverted} != false`);
+  // Back panel: offset by panel height, auto-inverted, NO coordinate shift.
+  if (Math.abs(layout[1].top - (0.3 + PANEL_H)) > EPS)
+    errs.push(`back top ${layout[1].top} != ${0.3 + PANEL_H}`);
+  if (Math.abs(layout[1].left - 0.5) > EPS) errs.push(`back left ${layout[1].left} != 0.5`);
+  if (layout[1].inverted !== true) errs.push(`back inverted ${layout[1].inverted} != true`);
+
+  if (errs.length) {
+    failures += errs.length;
+    console.error(`✗ fold(single): ${errs.length} issue(s)`);
+    errs.forEach((e) => console.error("   " + e));
+  } else {
+    console.log("✓ fold(single): back panel offset + auto-inverted, no shift");
+  }
+}
+
 if (failures) {
   // Non-zero exit via throw (avoids a Node type dependency in the lib tsconfig).
   throw new Error(`${failures} mismatch(es) — badge_layout compatibility BROKEN`);

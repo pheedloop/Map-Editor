@@ -89,6 +89,12 @@ export interface BadgePage {
   id: string;
   role: PageRole;
   fields: BadgeField[];
+  /**
+   * Whether this panel prints upside-down (folded back panel). Authoring is
+   * always upright; this only affects flatten (adds a 180° rotation to every
+   * field). Undefined = use the fold-type default (see foldInvertForPage).
+   */
+  inverted?: boolean;
 }
 
 export interface BadgeBackground {
@@ -155,3 +161,15 @@ export const PAGE_COUNT: Record<FoldType, number> = {
   single: 2,
   double: 3,
 };
+
+/** Page role for a panel index given the total panel count (top→bottom). */
+export function pageRoleForIndex(count: number, index: number): PageRole {
+  if (count <= 1) return "front";
+  if (count === 2) return index === 0 ? "front" : "back";
+  return (["front", "inner", "back"] as const)[index] ?? "front";
+}
+
+/** Human label for a page role (Inside is the legacy term for the inner panel). */
+export function pageRoleLabel(role: PageRole): string {
+  return role === "inner" ? "Inside" : role === "back" ? "Back" : "Front";
+}
