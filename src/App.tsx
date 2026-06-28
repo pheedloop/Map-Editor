@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getProduct, DEFAULT_PRODUCT } from "./routes/productRouter";
 import { MapApp } from "./map/MapApp";
 import { SeatplannerApp } from "./seatplanner/SeatplannerApp";
+import { BadgeEditorApp } from "./badgeeditor/BadgeEditorApp";
 
 function App() {
   const [product, setProduct] = useState(getProduct);
@@ -25,7 +26,9 @@ function App() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  return product === "seatplanner" ? <SeatplannerApp /> : <MapApp />;
+  if (product === "seatplanner") return <SeatplannerApp />;
+  if (product === "badge") return <BadgeEditorApp />;
+  return <MapApp />;
 }
 
 export default App;

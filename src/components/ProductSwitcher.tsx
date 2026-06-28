@@ -3,6 +3,7 @@ import { productHref, type Product } from "../routes/productRouter";
 const PRODUCTS: { id: Product; label: string }[] = [
   { id: "map", label: "Map" },
   { id: "seatplanner", label: "Seatplanner" },
+  { id: "badge", label: "Badge" },
 ];
 
 /**
