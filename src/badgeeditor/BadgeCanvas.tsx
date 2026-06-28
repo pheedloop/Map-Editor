@@ -15,17 +15,47 @@ import type Konva from "konva";
 import { DPI, type BadgeField, type BadgePage, type SlotType } from "./model";
 import { fieldDisplayText } from "./factory";
 import { fieldSizePx, useBadgeGuides } from "./useBadgeGuides";
+import {
+  fieldQrUrl,
+  fieldValueText,
+  type BadgeData,
+} from "./badgeData";
 import qrCodeUrl from "./qr-code.png";
 
-/** Load the stand-in QR image once (shared across all QR fields). */
-export function useQrImage(): HTMLImageElement | null {
-  const [img, setImg] = useState<HTMLImageElement | null>(null);
+// Shared image cache so per-field / per-ticket QR URLs load once. Undefined urls
+// fall back to the bundled stand-in QR.
+const STAND_IN_QR = qrCodeUrl;
+const imageCache = new Map<string, HTMLImageElement>();
+
+/**
+ * Ensure the given image urls are loaded (undefined → stand-in) and return a
+ * lookup. One hook call per component instance — pass an array, not per-row.
+ */
+function useImageLoader(
+  urls: (string | undefined)[],
+): (url?: string) => HTMLImageElement | null {
+  const [, bump] = useState(0);
+  const key = urls.map((u) => u ?? "").join("|");
   useEffect(() => {
-    const im = new window.Image();
-    im.src = qrCodeUrl;
-    im.onload = () => setImg(im);
-  }, []);
-  return img;
+    let alive = true;
+    for (const u of urls) {
+      const src = u || STAND_IN_QR;
+      if (!imageCache.has(src)) {
+        const im = new window.Image();
+        im.crossOrigin = "anonymous";
+        im.onload = () => {
+          imageCache.set(src, im);
+          if (alive) bump((x) => x + 1);
+        };
+        im.src = src;
+      }
+    }
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return (u?: string) => imageCache.get(u || STAND_IN_QR) ?? null;
 }
 
 // Canvas renders at 96px per inch (the legacy DPI); zoom is layered on top via
@@ -56,6 +86,8 @@ const SLOT_SPECS = {
 interface BadgeCanvasProps {
   page: BadgePage;
   panelSize: { width: number; height: number };
+  /** Resolved attendee data to render, or null for placeholders. */
+  data: BadgeData | null;
   /** Lanyard slot style, drawn near the top of the front panel only. */
   slots: SlotType;
   isFrontPage: boolean;
@@ -83,6 +115,7 @@ interface BadgeCanvasProps {
 export function BadgeCanvas({
   page,
   panelSize,
+  data,
   slots,
   isFrontPage,
   foldTop,
@@ -103,7 +136,6 @@ export function BadgeCanvas({
   const transformerRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef(new Map<string, Konva.Group>());
   const { activeGuides, snap, clear } = useBadgeGuides(page.fields, panelSize);
-  const qrImage = useQrImage();
 
   // Hold Space to pan (matches the map editor). While held, the stage drags and
   // fields are inert.
@@ -395,7 +427,7 @@ export function BadgeCanvas({
           <FieldShape
             key={field.id}
             field={field}
-            qrImage={qrImage}
+            data={data}
             panMode={panMode}
             registerRef={(node) => {
               if (node) nodeRefs.current.set(field.id, node);
@@ -490,7 +522,7 @@ export function BadgeCanvas({
 
 interface FieldShapeProps {
   field: BadgeField;
-  qrImage: HTMLImageElement | null;
+  data: BadgeData | null;
   panMode: boolean;
   registerRef: (node: Konva.Group | null) => void;
   onMouseDown: (additive: boolean) => void;
@@ -502,7 +534,7 @@ interface FieldShapeProps {
 
 function FieldShape({
   field,
-  qrImage,
+  data,
   panMode,
   registerRef,
   onMouseDown,
@@ -559,7 +591,7 @@ function FieldShape({
         }
       }}
     >
-      <FieldBody field={field} qrImage={qrImage} />
+      <FieldBody field={field} data={data} />
     </Group>
   );
 }
@@ -569,19 +601,18 @@ function FieldShape({
  * interactive FieldShape and the read-only StaticField used in Full Preview.
  * Rendered at the group origin; includes the field-level 180° inversion.
  */
-function FieldBody({
-  field,
-  qrImage,
-}: {
-  field: BadgeField;
-  qrImage: HTMLImageElement | null;
-}) {
-  if (field.kind === "qrCode") {
+function FieldBody({ field, data }: { field: BadgeField; data: BadgeData | null }) {
+  const isQrField = field.kind === "qrCode";
+  const qrUrl = isQrField && data ? fieldQrUrl(field, data) : undefined;
+  const getImg = useImageLoader(isQrField ? [qrUrl] : []);
+
+  if (isQrField) {
     const size = QR_BASE_PX * (field.scale ?? 1);
-    return qrImage ? (
+    const img = getImg(qrUrl);
+    return img ? (
       <>
         <Rect width={size} height={size} fill="#ffffff" />
-        <KonvaImage image={qrImage} width={size} height={size} listening={false} />
+        <KonvaImage image={img} width={size} height={size} listening={false} />
       </>
     ) : (
       <>
@@ -620,7 +651,7 @@ function FieldBody({
         rotation={inverted ? 180 : 0}
         listening={false}
       >
-        <FieldContent field={field} w={w} h={h} fontSize={fontSize} qrImage={qrImage} />
+        <FieldContent field={field} w={w} h={h} fontSize={fontSize} data={data} />
       </Group>
     </>
   );
@@ -629,15 +660,15 @@ function FieldBody({
 /** Read-only positioned field visual for the full-preview render. */
 export function StaticField({
   field,
-  qrImage,
+  data,
 }: {
   field: BadgeField;
-  qrImage: HTMLImageElement | null;
+  data: BadgeData | null;
 }) {
   const { w, h } = fieldSizePx(field);
   return (
     <Group x={field.left * PPI} y={field.top * PPI} width={w} height={h} listening={false}>
-      <FieldBody field={field} qrImage={qrImage} />
+      <FieldBody field={field} data={data} />
     </Group>
   );
 }
@@ -766,16 +797,25 @@ function FieldContent({
   w,
   h,
   fontSize,
-  qrImage,
+  data,
 }: {
   field: BadgeField;
   w: number;
   h: number;
   fontSize: number;
-  qrImage: HTMLImageElement | null;
+  data: BadgeData | null;
 }) {
-  if (field.kind === "tickets") {
-    const rows = field.numRows ?? 1;
+  const isTickets = field.kind === "tickets";
+  const rows = field.numRows ?? 1;
+  // Ticket QR urls (real per-ticket, or stand-in placeholders) — one hook call.
+  const ticketUrls = isTickets
+    ? data
+      ? data.tickets.slice(0, rows).map((t) => t.qrUrl)
+      : Array.from({ length: rows }, () => undefined)
+    : [];
+  const getTicketImg = useImageLoader(ticketUrls);
+
+  if (isTickets) {
     const rowH = h / rows;
     // Each row mirrors a printed ticket: a QR (~80% of row height) + the ticket
     // name, like badge_generator.py _render_tickets.
@@ -783,18 +823,30 @@ function FieldContent({
     const qrSize = Math.max(0, rowH - pad * 2);
     const nameX = pad + qrSize + rowH * 0.18;
     const nameFont = Math.min(14, Math.max(7, rowH * 0.3));
+    const count = data ? Math.min(rows, data.tickets.length) : rows;
     return (
       <>
-        {Array.from({ length: rows }).map((_, i) => {
+        {/* Perforations are part of the (pre-perforated) media: always numRows-1,
+            independent of how many tickets are actually filled. */}
+        {Array.from({ length: rows - 1 }).map((_, i) => (
+          <Line
+            key={`perf-${i}`}
+            points={[0, rowH * (i + 1), w, rowH * (i + 1)]}
+            stroke="#cbd5e1"
+            strokeWidth={1}
+            listening={false}
+          />
+        ))}
+        {/* Ticket content fills the top sections. */}
+        {Array.from({ length: count }).map((_, i) => {
           const top = rowH * i;
+          const name = data ? data.tickets[i].name : TICKET_NAME_PLACEHOLDER;
+          const img = getTicketImg(data ? data.tickets[i].qrUrl : undefined);
           return (
             <Group key={i}>
-              {i > 0 && (
-                <Line points={[0, top, w, top]} stroke="#cbd5e1" strokeWidth={1} />
-              )}
-              {qrImage ? (
+              {img ? (
                 <KonvaImage
-                  image={qrImage}
+                  image={img}
                   x={pad}
                   y={top + pad}
                   width={qrSize}
@@ -812,7 +864,7 @@ function FieldContent({
                 />
               )}
               <Text
-                text={TICKET_NAME_PLACEHOLDER}
+                text={name}
                 x={nameX}
                 y={top}
                 width={Math.max(0, w - nameX - pad)}
@@ -825,6 +877,34 @@ function FieldContent({
             </Group>
           );
         })}
+      </>
+    );
+  }
+
+  // session_schedule with real data → one line per session (date · time · speaker)
+  if (field.kind === "sessionSchedule" && data) {
+    const lineFont = Math.min(fontSize, 11);
+    const lineH = lineFont * 1.45;
+    if (data.sessions.length === 0) {
+      return (
+        <Text text="(no sessions)" width={w} height={h} align="center" verticalAlign="middle" fontSize={lineFont} fill="#94a3b8" />
+      );
+    }
+    return (
+      <>
+        {data.sessions.map((s, i) => (
+          <Text
+            key={i}
+            x={2}
+            y={i * lineH}
+            width={w - 4}
+            text={`${s.date}  ${s.time}  ${s.speaker}`.trim()}
+            fontSize={lineFont}
+            fill="#0f172a"
+            wrap="none"
+            ellipsis
+          />
+        ))}
       </>
     );
   }
@@ -843,9 +923,10 @@ function FieldContent({
     );
   }
 
+  const text = data ? fieldValueText(field, data) : fieldDisplayText(field);
   return (
     <Text
-      text={fieldDisplayText(field)}
+      text={text}
       width={w}
       height={h}
       align={

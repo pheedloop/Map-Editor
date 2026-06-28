@@ -13,10 +13,16 @@ import { BadgeCanvas } from "./BadgeCanvas";
 import { BadgeSidebar } from "./BadgeSidebar";
 import { BadgePreview } from "./BadgePreview";
 import { BadgeSetupDialog, type PanelConfig } from "./BadgeSetupDialog";
+import { AttendeePicker } from "./AttendeePicker";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { createField } from "./factory";
 import { flatten, foldInvertForPage } from "./serialize";
 import { createSampleDocument } from "./sample";
+import type {
+  AttendeeOption,
+  AttendeeProvider,
+  BadgeData,
+} from "./badgeData";
 import {
   PAGE_COUNT,
   pageRoleForIndex,
@@ -36,6 +42,9 @@ export interface BadgeEditorProps {
   onSave?: (doc: BadgeDocument, flattened: FlattenResult) => void;
   /** Show the debug affordance (badge_layout JSON viewer). */
   debug?: boolean;
+  /** Supplies attendee search + badge-data resolution for the live preview.
+   *  When omitted, the picker is hidden and fields show placeholders. */
+  attendeeProvider?: AttendeeProvider;
 }
 
 /** Inches → compact string (trims trailing zeros): 4, 5.5, 2.85. */
@@ -66,6 +75,7 @@ export function BadgeEditor({
   initialDocument,
   onSave,
   debug,
+  attendeeProvider,
 }: BadgeEditorProps) {
   const [initial] = useState<BadgeDocument>(
     () => initialDocument ?? createSampleDocument(),
@@ -84,7 +94,25 @@ export function BadgeEditor({
   const [showLayout, setShowLayout] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [previewAttendee, setPreviewAttendee] = useState<AttendeeOption | null>(null);
+  const [previewData, setPreviewData] = useState<BadgeData | null>(null);
   const clipboard = useRef<BadgeField[]>([]);
+
+  // Resolve the selected attendee's badge data (or clear it).
+  const selectAttendee = useCallback(
+    (option: AttendeeOption | null) => {
+      setPreviewAttendee(option);
+      if (!option || !attendeeProvider) {
+        setPreviewData(null);
+        return;
+      }
+      attendeeProvider
+        .resolve(option.id)
+        .then((d) => setPreviewData(d))
+        .catch(() => setPreviewData(null));
+    },
+    [attendeeProvider],
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
   const controls = useCanvasControls(containerRef);
@@ -404,6 +432,13 @@ export function BadgeEditor({
               </span>
             )}
             <div className="flex-1" />
+            {attendeeProvider && (
+              <AttendeePicker
+                provider={attendeeProvider}
+                value={previewAttendee}
+                onChange={selectAttendee}
+              />
+            )}
             <Button
               variant={previewMode ? "solid" : "outline"}
               color="neutral"
@@ -416,7 +451,7 @@ export function BadgeEditor({
 
           {previewMode ? (
             <div className="flex-1 min-h-0 overflow-hidden">
-              <BadgePreview doc={doc} />
+              <BadgePreview doc={doc} data={previewData} />
             </div>
           ) : (
             <div
@@ -426,6 +461,7 @@ export function BadgeEditor({
               <BadgeCanvas
                 page={activePage}
                 panelSize={doc.panelSize}
+                data={previewData}
                 slots={doc.slots ?? "none"}
                 isFrontPage={pageIndex === 0}
                 foldTop={foldTop}
