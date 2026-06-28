@@ -85,6 +85,9 @@ export interface BadgeField {
 export type FoldType = "none" | "single" | "double";
 export type PageRole = "front" | "back" | "inner";
 
+/** Lanyard hole-punch style at the top of the badge. */
+export type SlotType = "none" | "two-circle" | "three-rect";
+
 export interface BadgePage {
   id: string;
   role: PageRole;
@@ -95,6 +98,14 @@ export interface BadgePage {
    * field). Undefined = use the fold-type default (see foldInvertForPage).
    */
   inverted?: boolean;
+  /**
+   * Perforated tear-away panel (e.g. ticket stubs on the 3rd panel of a
+   * double-fold badge). Shown as static dotted perforation lines; editor-only —
+   * it does not affect the flattened badge_layout.
+   */
+  tearaway?: boolean;
+  /** Number of tear-off stubs (sections) on a tearaway panel. Default 3. */
+  tearawayCount?: number;
 }
 
 export interface BadgeBackground {
@@ -116,6 +127,8 @@ export interface BadgeDocument {
   /** "none" = 1 page, "single" = 2 pages (one fold), "double" = 3 pages. */
   fold: FoldType;
   pages: BadgePage[];
+  /** Lanyard hole-punch style. Editor-only (physical media); defaults to none. */
+  slots?: SlotType;
   background?: BadgeBackground;
 }
 

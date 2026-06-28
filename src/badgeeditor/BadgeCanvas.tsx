@@ -1,7 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { Stage, Layer, Rect, Text, Group, Line, Image as KonvaImage, Transformer } from "react-konva";
+import {
+  Stage,
+  Layer,
+  Rect,
+  Circle,
+  Text,
+  Group,
+  Line,
+  Arrow,
+  Image as KonvaImage,
+  Transformer,
+} from "react-konva";
 import type Konva from "konva";
-import { DPI, type BadgeField, type BadgePage } from "./model";
+import { DPI, type BadgeField, type BadgePage, type SlotType } from "./model";
 import { fieldDisplayText } from "./factory";
 import { fieldSizePx, useBadgeGuides } from "./useBadgeGuides";
 import qrCodeUrl from "./qr-code.png";
@@ -21,10 +32,36 @@ function useQrImage(): HTMLImageElement | null {
 // useCanvasControls' `scale`.
 const PPI = DPI;
 const QR_BASE_PX = 75;
+const PANEL_CORNER_IN = 0.25; // corner fillet
+
+// ---------------------------------------------------------------------------
+// Lanyard slot geometry — all values in INCHES. Tweak freely to match physical
+// badge stock; everything is measured from the top edge of the front panel and
+// centered horizontally.
+// ---------------------------------------------------------------------------
+const SLOT_SPECS = {
+  twoCircle: {
+    radius: 0.09, // hole radius
+    y: 0.3, // top edge → hole center
+    spacing: 2.5, // center-to-center distance between the two holes
+  },
+  threeRect: {
+    width: 0.55, // slot width
+    height: 0.13, // slot height
+    gap: 0.55, // gap between adjacent slots
+    y: 0.18, // top edge → slot top
+  },
+};
 
 interface BadgeCanvasProps {
   page: BadgePage;
   panelSize: { width: number; height: number };
+  /** Lanyard slot style, drawn near the top of the front panel only. */
+  slots: SlotType;
+  isFrontPage: boolean;
+  /** Fold edges connecting to adjacent panels (multi-page badges). */
+  foldTop: boolean;
+  foldBottom: boolean;
   selectedIds: Set<string>;
   /** mousedown on a field — additive = shift held. */
   onFieldMouseDown: (id: string, additive: boolean) => void;
@@ -46,6 +83,10 @@ interface BadgeCanvasProps {
 export function BadgeCanvas({
   page,
   panelSize,
+  slots,
+  isFrontPage,
+  foldTop,
+  foldBottom,
   selectedIds,
   onFieldMouseDown,
   onClearSelection,
@@ -98,19 +139,27 @@ export function BadgeCanvas({
 
   // Marquee + middle-mouse pan state.
   const marqueeOrigin = useRef<{ x: number; y: number } | null>(null);
-  const [marquee, setMarquee] = useState<Konva.Vector2d & { w: number; h: number } | null>(null);
-  const middlePan = useRef<{ cx: number; cy: number; sx: number; sy: number } | null>(null);
+  const [marquee, setMarquee] = useState<
+    (Konva.Vector2d & { w: number; h: number }) | null
+  >(null);
+  const middlePan = useRef<{
+    cx: number;
+    cy: number;
+    sx: number;
+    sy: number;
+  } | null>(null);
   // Start positions captured at drag start (for multi-move).
   const dragStarts = useRef(new Map<string, { x: number; y: number }>());
 
-  const singleSelectedId =
-    selectedIds.size === 1 ? [...selectedIds][0] : null;
+  const singleSelectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
 
   // Transformer attaches only for a single selection (group resize is disabled).
   useEffect(() => {
     const tr = transformerRef.current;
     if (!tr) return;
-    const node = singleSelectedId ? nodeRefs.current.get(singleSelectedId) : null;
+    const node = singleSelectedId
+      ? nodeRefs.current.get(singleSelectedId)
+      : null;
     tr.nodes(node ? [node] : []);
     tr.getLayer()?.batchDraw();
   }, [singleSelectedId, page.fields]);
@@ -118,7 +167,8 @@ export function BadgeCanvas({
   const panelW = panelSize.width * PPI;
   const panelH = panelSize.height * PPI;
 
-  const isQr = page.fields.find((f) => f.id === singleSelectedId)?.kind === "qrCode";
+  const isQr =
+    page.fields.find((f) => f.id === singleSelectedId)?.kind === "qrCode";
   const enabledAnchors = isQr
     ? ["top-left", "top-right", "bottom-left", "bottom-right"]
     : ["middle-left", "middle-right", "top-center", "bottom-center"];
@@ -166,7 +216,10 @@ export function BadgeCanvas({
       const stage = stageRef.current;
       if (!stage) return;
       const { cx, cy, sx, sy } = middlePan.current;
-      stage.position({ x: sx + (e.evt.clientX - cx), y: sy + (e.evt.clientY - cy) });
+      stage.position({
+        x: sx + (e.evt.clientX - cx),
+        y: sy + (e.evt.clientY - cy),
+      });
       return;
     }
     if (marqueeOrigin.current) {
@@ -198,7 +251,11 @@ export function BadgeCanvas({
         return fl < r.x + r.w && fl + w > r.x && ft < r.y + r.h && ft + h > r.y;
       });
       // Treat a click (no real drag) as "no marquee selection".
-      if (r.w > 2 || r.h > 2) onMarqueeSelect(hit.map((f) => f.id), e.evt.shiftKey);
+      if (r.w > 2 || r.h > 2)
+        onMarqueeSelect(
+          hit.map((f) => f.id),
+          e.evt.shiftKey,
+        );
     }
     marqueeOrigin.current = null;
     setMarquee(null);
@@ -255,7 +312,10 @@ export function BadgeCanvas({
   const multiBounds =
     selectedIds.size > 1
       ? (() => {
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          let minX = Infinity,
+            minY = Infinity,
+            maxX = -Infinity,
+            maxY = -Infinity;
           for (const f of page.fields) {
             if (!selectedIds.has(f.id)) continue;
             const { w, h } = fieldSizePx(f);
@@ -264,7 +324,9 @@ export function BadgeCanvas({
             maxX = Math.max(maxX, f.left * PPI + w);
             maxY = Math.max(maxY, f.top * PPI + h);
           }
-          return minX === Infinity ? null : { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+          return minX === Infinity
+            ? null
+            : { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
         })()
       : null;
 
@@ -283,7 +345,8 @@ export function BadgeCanvas({
       onMouseMove={handleStageMouseMove}
       onMouseUp={handleStageMouseUp}
       onDragEnd={(e) => {
-        if (e.target === stageRef.current) onPositionChange(stageRef.current.position());
+        if (e.target === stageRef.current)
+          onPositionChange(stageRef.current.position());
       }}
     >
       <Layer>
@@ -294,6 +357,7 @@ export function BadgeCanvas({
           y={0}
           width={panelW}
           height={panelH}
+          cornerRadius={PANEL_CORNER_IN * PPI}
           fill="#ffffff"
           stroke="#cbd5e1"
           strokeWidth={1}
@@ -302,6 +366,30 @@ export function BadgeCanvas({
           shadowBlur={12}
           shadowOffsetY={2}
         />
+
+        {/* Lanyard slots — front panel only (static; editor-only) */}
+        {isFrontPage && slots !== "none" && (
+          <Slots slots={slots} panelW={panelW} />
+        )}
+
+        {/* Tear-away perforation lines (static; editor-only) */}
+        {page.tearaway &&
+          (() => {
+            const stubs = Math.max(1, page.tearawayCount ?? 3);
+            return Array.from({ length: stubs - 1 }).map((_, i) => {
+              const y = (panelH * (i + 1)) / stubs;
+              return (
+                <Line
+                  key={`tear-${i}`}
+                  points={[0, y, panelW, y]}
+                  stroke="#94a3b8"
+                  strokeWidth={1}
+                  dash={[2, 3]}
+                  listening={false}
+                />
+              );
+            });
+          })()}
 
         {page.fields.map((field) => (
           <FieldShape
@@ -338,9 +426,23 @@ export function BadgeCanvas({
         {/* Alignment guides */}
         {activeGuides.map((g, i) =>
           g.axis === "x" ? (
-            <Line key={`gx-${i}`} points={[g.position, 0, g.position, panelH]} stroke="#ec4899" strokeWidth={1} dash={[4, 4]} listening={false} />
+            <Line
+              key={`gx-${i}`}
+              points={[g.position, 0, g.position, panelH]}
+              stroke="#ec4899"
+              strokeWidth={1}
+              dash={[4, 4]}
+              listening={false}
+            />
           ) : (
-            <Line key={`gy-${i}`} points={[0, g.position, panelW, g.position]} stroke="#ec4899" strokeWidth={1} dash={[4, 4]} listening={false} />
+            <Line
+              key={`gy-${i}`}
+              points={[0, g.position, panelW, g.position]}
+              stroke="#ec4899"
+              strokeWidth={1}
+              dash={[4, 4]}
+              listening={false}
+            />
           ),
         )}
 
@@ -356,6 +458,16 @@ export function BadgeCanvas({
             strokeWidth={1}
             dash={[4, 4]}
             listening={false}
+          />
+        )}
+
+        {/* Fold indicators (section-plane style) on edges that connect panels */}
+        {(foldTop || foldBottom) && (
+          <FoldIndicators
+            foldTop={foldTop}
+            foldBottom={foldBottom}
+            panelW={panelW}
+            panelH={panelH}
           />
         )}
 
@@ -437,12 +549,26 @@ function FieldShape({
         {qrImage ? (
           <>
             <Rect width={size} height={size} fill="#ffffff" />
-            <KonvaImage image={qrImage} width={size} height={size} listening={false} />
+            <KonvaImage
+              image={qrImage}
+              width={size}
+              height={size}
+              listening={false}
+            />
           </>
         ) : (
           <>
             <Rect width={size} height={size} fill="#0f172a" cornerRadius={2} />
-            <Text text="QR" width={size} height={size} align="center" verticalAlign="middle" fill="#ffffff" fontSize={Math.max(10, size * 0.25)} listening={false} />
+            <Text
+              text="QR"
+              width={size}
+              height={size}
+              align="center"
+              verticalAlign="middle"
+              fill="#ffffff"
+              fontSize={Math.max(10, size * 0.25)}
+              listening={false}
+            />
           </>
         )}
       </Group>
@@ -480,11 +606,30 @@ function FieldShape({
       height={h}
     >
       {field.kind === "image" ? (
-        <Rect width={w} height={h} fill="#e2e8f0" stroke="#94a3b8" strokeWidth={1} />
+        <Rect
+          width={w}
+          height={h}
+          fill="#e2e8f0"
+          stroke="#94a3b8"
+          strokeWidth={1}
+        />
       ) : field.kind === "tickets" ? (
-        <Rect width={w} height={h} fill="transparent" stroke="#0f172a" strokeWidth={1} />
+        <Rect
+          width={w}
+          height={h}
+          fill="transparent"
+          stroke="#0f172a"
+          strokeWidth={1}
+        />
       ) : (
-        <Rect width={w} height={h} fill="transparent" stroke="#94a3b8" strokeWidth={1} dash={[4, 4]} />
+        <Rect
+          width={w}
+          height={h}
+          fill="transparent"
+          stroke="#94a3b8"
+          strokeWidth={1}
+          dash={[4, 4]}
+        />
       )}
       <Group
         x={inverted ? w : 0}
@@ -495,6 +640,121 @@ function FieldShape({
         <FieldContent field={field} w={w} h={h} fontSize={fontSize} />
       </Group>
     </Group>
+  );
+}
+
+/** Static lanyard hole-punch slots near the top of the front panel. */
+function Slots({ slots, panelW }: { slots: SlotType; panelW: number }) {
+  const fill = "#f1f5f9";
+  const stroke = "#94a3b8";
+
+  if (slots === "two-circle") {
+    const s = SLOT_SPECS.twoCircle;
+    const r = s.radius * PPI;
+    const cy = s.y * PPI;
+    const dx = (s.spacing / 2) * PPI;
+    return (
+      <>
+        <Circle
+          x={panelW / 2 - dx}
+          y={cy}
+          radius={r}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={1}
+          listening={false}
+        />
+        <Circle
+          x={panelW / 2 + dx}
+          y={cy}
+          radius={r}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={1}
+          listening={false}
+        />
+      </>
+    );
+  }
+
+  // three-rect — three pill slots side by side
+  const s = SLOT_SPECS.threeRect;
+  const sw = s.width * PPI;
+  const sh = s.height * PPI;
+  const gap = s.gap * PPI;
+  const y = s.y * PPI;
+  const total = 3 * sw + 2 * gap;
+  const startX = (panelW - total) / 2;
+  return (
+    <>
+      {[0, 1, 2].map((i) => (
+        <Rect
+          key={i}
+          x={startX + i * (sw + gap)}
+          y={y}
+          width={sw}
+          height={sh}
+          cornerRadius={sh / 2}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={1}
+          listening={false}
+        />
+      ))}
+    </>
+  );
+}
+
+/**
+ * Section-plane-style fold indicator: a dash-dot line across a panel edge with
+ * arrows pointing toward the adjacent panel (the fold direction). Drawn on the
+ * edges that connect to other panels in a multi-page badge.
+ */
+function FoldIndicators({
+  foldTop,
+  foldBottom,
+  panelW,
+  panelH,
+}: {
+  foldTop: boolean;
+  foldBottom: boolean;
+  panelW: number;
+  panelH: number;
+}) {
+  const color = "#6366f1"; // indigo — distinct from guides/slots/tearaways
+  const gap = 0.12 * PPI; // breathing room between the panel edge and the line
+  const overhang = 0.35 * PPI; // how far the line extends past the panel width
+  const arrowLen = 0.3 * PPI;
+  const dash = [10, 4, 2, 4]; // dash-dot
+
+  // `edgeY` is the panel edge; the line sits `gap` beyond it in the fold dir.
+  const edge = (edgeY: number, dir: 1 | -1, key: string) => {
+    const y = edgeY + dir * gap;
+    const x1 = -overhang;
+    const x2 = panelW + overhang;
+    return (
+      <Group key={key} listening={false}>
+        <Line points={[x1, y, x2, y]} stroke={color} strokeWidth={1} dash={dash} />
+        {[x1, x2].map((x, i) => (
+          <Arrow
+            key={i}
+            points={[x, y, x, y + dir * arrowLen]}
+            stroke={color}
+            fill={color}
+            strokeWidth={1.5}
+            pointerLength={6}
+            pointerWidth={6}
+          />
+        ))}
+      </Group>
+    );
+  };
+
+  return (
+    <>
+      {foldTop && edge(0, -1, "top")}
+      {foldBottom && edge(panelH, 1, "bottom")}
+    </>
   );
 }
 
@@ -516,8 +776,20 @@ function FieldContent({
       <>
         {Array.from({ length: rows }).map((_, i) => (
           <Group key={i}>
-            {i > 0 && <Line points={[0, rowH * i, w, rowH * i]} stroke="#0f172a" strokeWidth={1} />}
-            <Text text={`Ticket ${i + 1}`} x={8} y={rowH * i + 6} fontSize={12} fill="#0f172a" />
+            {i > 0 && (
+              <Line
+                points={[0, rowH * i, w, rowH * i]}
+                stroke="#0f172a"
+                strokeWidth={1}
+              />
+            )}
+            <Text
+              text={`Ticket ${i + 1}`}
+              x={8}
+              y={rowH * i + 6}
+              fontSize={12}
+              fill="#0f172a"
+            />
           </Group>
         ))}
       </>
@@ -525,7 +797,17 @@ function FieldContent({
   }
 
   if (field.kind === "image") {
-    return <Text text="Image" width={w} height={h} align="center" verticalAlign="middle" fontSize={14} fill="#64748b" />;
+    return (
+      <Text
+        text="Image"
+        width={w}
+        height={h}
+        align="center"
+        verticalAlign="middle"
+        fontSize={14}
+        fill="#64748b"
+      />
+    );
   }
 
   return (
@@ -533,7 +815,9 @@ function FieldContent({
       text={fieldDisplayText(field)}
       width={w}
       height={h}
-      align={field.textAlign === "justify" ? "left" : field.textAlign ?? "center"}
+      align={
+        field.textAlign === "justify" ? "left" : (field.textAlign ?? "center")
+      }
       verticalAlign="middle"
       fontSize={fontSize}
       fill="#0f172a"

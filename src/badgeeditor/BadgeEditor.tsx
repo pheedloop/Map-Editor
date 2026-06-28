@@ -2,11 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { useCanvasControls } from "../editor/hooks/useCanvasControls";
 import { useHistory } from "../editor/hooks/useHistory";
-import { Button, IconButton, TabBar, type MenuEntry } from "../editor/components/ui";
+import {
+  Button,
+  IconButton,
+  TabBar,
+  type MenuEntry,
+} from "../editor/components/ui";
 import { BadgeTopBar, modKey } from "./BadgeTopBar";
 import { BadgeCanvas } from "./BadgeCanvas";
 import { BadgeSidebar } from "./BadgeSidebar";
-import { BadgeSetupDialog } from "./BadgeSetupDialog";
+import { BadgeSetupDialog, type PanelConfig } from "./BadgeSetupDialog";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { createField } from "./factory";
 import { flatten, foldInvertForPage } from "./serialize";
@@ -19,6 +24,7 @@ import {
   type BadgeField,
   type FlattenResult,
   type FoldType,
+  type SlotType,
 } from "./model";
 
 export interface BadgeEditorProps {
@@ -39,7 +45,12 @@ function isEditableTarget(t: EventTarget | null): boolean {
   const el = t as HTMLElement | null;
   if (!el) return false;
   const tag = el.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    el.isContentEditable
+  );
 }
 
 /**
@@ -50,7 +61,11 @@ function isEditableTarget(t: EventTarget | null): boolean {
  * multi-page folded badges (front/back/inside) that flatten to the legacy
  * badge_layout on Save.
  */
-export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps) {
+export function BadgeEditor({
+  initialDocument,
+  onSave,
+  debug,
+}: BadgeEditorProps) {
   const [initial] = useState<BadgeDocument>(
     () => initialDocument ?? createSampleDocument(),
   );
@@ -79,7 +94,7 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
   // Properties panel edits the field only when exactly one is selected.
   const selectedField =
     selectedIds.size === 1
-      ? activePage.fields.find((f) => selectedIds.has(f.id)) ?? null
+      ? (activePage.fields.find((f) => selectedIds.has(f.id)) ?? null)
       : null;
   const flattened = useMemo(() => flatten(doc), [doc]);
 
@@ -194,19 +209,26 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
     (
       fold: FoldType,
       panelSize: { width: number; height: number },
-      inverts: boolean[],
+      panelCfgs: PanelConfig[],
+      slots: SlotType,
     ) => {
       setDoc((d) => {
         const count = PAGE_COUNT[fold];
         const pages = Array.from({ length: count }, (_, i) => {
           const role = pageRoleForIndex(count, i);
-          const inverted = inverts[i] ?? foldInvertForPage(fold, i);
+          const cfg = panelCfgs[i];
+          const props = {
+            role,
+            inverted: cfg?.inverted ?? foldInvertForPage(fold, i),
+            tearaway: cfg?.tearaway ?? false,
+            tearawayCount: cfg?.tearawayCount ?? 3,
+          };
           const existing = d.pages[i];
           return existing
-            ? { ...existing, role, inverted }
-            : { id: uuid(), role, fields: [], inverted };
+            ? { ...existing, ...props }
+            : { id: uuid(), fields: [], ...props };
         });
-        return { ...d, fold, panelSize, pages };
+        return { ...d, fold, panelSize, slots, pages };
       });
       setActivePageIndex((idx) => Math.min(idx, PAGE_COUNT[fold] - 1));
       setSelectedIds(new Set());
@@ -239,14 +261,25 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
       } else if (mod && e.key.toLowerCase() === "v") {
         e.preventDefault();
         pasteClipboard();
-      } else if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size) {
+      } else if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        selectedIds.size
+      ) {
         e.preventDefault();
         deleteSelected();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedIds, deleteSelected, undo, redo, copySelected, pasteClipboard, handleSave]);
+  }, [
+    selectedIds,
+    deleteSelected,
+    undo,
+    redo,
+    copySelected,
+    pasteClipboard,
+    handleSave,
+  ]);
 
   // --- Menus ---
 
@@ -284,8 +317,18 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
   }));
 
   const editMenu: MenuEntry[] = [
-    { label: "Undo", shortcut: `${modKey}Z`, disabled: !canUndo, onClick: undo },
-    { label: "Redo", shortcut: `${modKey}⇧Z`, disabled: !canRedo, onClick: redo },
+    {
+      label: "Undo",
+      shortcut: `${modKey}Z`,
+      disabled: !canUndo,
+      onClick: undo,
+    },
+    {
+      label: "Redo",
+      shortcut: `${modKey}⇧Z`,
+      disabled: !canRedo,
+      onClick: redo,
+    },
     { type: "divider" },
     {
       label: selectedIds.size > 1 ? `Copy (${selectedIds.size})` : "Copy",
@@ -335,8 +378,11 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
               />
             )}
             {pageInverts[pageIndex] && (
-              <span className="text-[11px] text-amber-600" title="This panel prints upside-down">
-                ⤓ prints upside-down
+              <span
+                className="text-[11px] text-amber-600"
+                title="This panel prints upside-down"
+              >
+                ⤓ prints upside-down automatically
               </span>
             )}
           </div>
@@ -348,6 +394,10 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
             <BadgeCanvas
               page={activePage}
               panelSize={doc.panelSize}
+              slots={doc.slots ?? "none"}
+              isFrontPage={pageIndex === 0}
+              foldTop={pageIndex > 0}
+              foldBottom={pageIndex < doc.pages.length - 1}
               selectedIds={selectedIds}
               onFieldMouseDown={selectField}
               onClearSelection={clearSelection}
@@ -366,7 +416,8 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
           <div className="relative z-20 flex items-center justify-between px-3 py-1.5 bg-white border-t border-gray-200 text-xs text-gray-500">
             <div className="flex items-center gap-2">
               <span>
-                Page {fmtIn(doc.panelSize.width)} × {fmtIn(doc.panelSize.height)}"
+                Page {fmtIn(doc.panelSize.width)} ×{" "}
+                {fmtIn(doc.panelSize.height)}"
               </span>
               <span className="text-gray-300">·</span>
               <span>
@@ -400,7 +451,12 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
               <span className="text-xs font-medium text-gray-600">
                 {selectedIds.size} fields selected
               </span>
-              <Button variant="ghost" color="negative" size="sm" onClick={deleteSelected}>
+              <Button
+                variant="ghost"
+                color="negative"
+                size="sm"
+                onClick={deleteSelected}
+              >
                 Delete
               </Button>
             </div>
@@ -425,6 +481,7 @@ export function BadgeEditor({ initialDocument, onSave, debug }: BadgeEditorProps
           fold={doc.fold}
           panelSize={doc.panelSize}
           pages={doc.pages}
+          slots={doc.slots ?? "none"}
           onApply={applySetup}
           onClose={() => setShowSetup(false)}
         />

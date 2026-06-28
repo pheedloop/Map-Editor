@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Button, Dialog, SectionLabel } from "../editor/components/ui";
+import { Button, Dialog, NumberInput, SectionLabel } from "../editor/components/ui";
 import {
   PAGE_COUNT,
   pageRoleForIndex,
   pageRoleLabel,
   type BadgePage,
   type FoldType,
+  type SlotType,
 } from "./model";
 import { foldInvertForPage } from "./serialize";
 
@@ -15,48 +16,74 @@ const FOLD_OPTIONS: { value: FoldType; label: string }[] = [
   { value: "double", label: "Double fold" },
 ];
 
+const SLOT_OPTIONS: { value: SlotType; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "two-circle", label: "Two circular" },
+  { value: "three-rect", label: "Three rectangular" },
+];
+
+const DEFAULT_TEARAWAYS = 3;
+
+/** Per-panel configuration edited in the dialog. */
+export interface PanelConfig {
+  inverted: boolean;
+  tearaway: boolean;
+  tearawayCount: number;
+}
+
 interface BadgeSetupDialogProps {
   fold: FoldType;
   panelSize: { width: number; height: number };
   pages: BadgePage[];
+  slots: SlotType;
   onApply: (
     fold: FoldType,
     panelSize: { width: number; height: number },
-    perPageInverted: boolean[],
+    panels: PanelConfig[],
+    slots: SlotType,
   ) => void;
   onClose: () => void;
 }
 
-/** Resolve a page's effective invert state (explicit override or fold default). */
-function resolveInvert(pages: BadgePage[], fold: FoldType, i: number): boolean {
-  return pages[i]?.inverted ?? foldInvertForPage(fold, i);
+function panelConfigFor(pages: BadgePage[], fold: FoldType, i: number): PanelConfig {
+  return {
+    inverted: pages[i]?.inverted ?? foldInvertForPage(fold, i),
+    tearaway: pages[i]?.tearaway ?? false,
+    tearawayCount: pages[i]?.tearawayCount ?? DEFAULT_TEARAWAYS,
+  };
 }
 
 export function BadgeSetupDialog({
   fold,
   panelSize,
   pages,
+  slots,
   onApply,
   onClose,
 }: BadgeSetupDialogProps) {
   const [localFold, setLocalFold] = useState<FoldType>(fold);
   const [w, setW] = useState(panelSize.width);
   const [h, setH] = useState(panelSize.height);
-  const [inverts, setInverts] = useState<boolean[]>(() =>
-    Array.from({ length: PAGE_COUNT[fold] }, (_, i) => resolveInvert(pages, fold, i)),
+  const [localSlots, setLocalSlots] = useState<SlotType>(slots);
+  const [panels, setPanels] = useState<PanelConfig[]>(() =>
+    Array.from({ length: PAGE_COUNT[fold] }, (_, i) => panelConfigFor(pages, fold, i)),
   );
 
   const count = PAGE_COUNT[localFold];
 
   const changeFold = (f: FoldType) => {
     setLocalFold(f);
-    setInverts((prev) =>
+    setPanels((prev) =>
       Array.from({ length: PAGE_COUNT[f] }, (_, i) =>
-        // keep an existing override if the panel persists, else use the new default
-        i < prev.length ? prev[i] : foldInvertForPage(f, i),
+        i < prev.length
+          ? prev[i]
+          : { inverted: foldInvertForPage(f, i), tearaway: false, tearawayCount: DEFAULT_TEARAWAYS },
       ),
     );
   };
+
+  const setPanel = (i: number, patch: Partial<PanelConfig>) =>
+    setPanels((prev) => prev.map((p, j) => (j === i ? { ...p, ...patch } : p)));
 
   const totalHeight = +(h * count).toFixed(4);
 
@@ -64,7 +91,7 @@ export function BadgeSetupDialog({
     <Dialog
       title="Badge Setup"
       onClose={onClose}
-      width="380px"
+      width="400px"
       footer={
         <>
           <Button variant="outline" color="neutral" onClick={onClose}>
@@ -74,7 +101,7 @@ export function BadgeSetupDialog({
             variant="solid"
             color="primary"
             onClick={() => {
-              onApply(localFold, { width: w, height: h }, inverts);
+              onApply(localFold, { width: w, height: h }, panels, localSlots);
               onClose();
             }}
           >
@@ -115,31 +142,61 @@ export function BadgeSetupDialog({
           {count > 1 && " (unfolded)"}
         </div>
 
+        <div className="flex flex-col gap-1.5">
+          <SectionLabel>Lanyard slots</SectionLabel>
+          <div className="flex gap-2">
+            {SLOT_OPTIONS.map((o) => (
+              <Button
+                key={o.value}
+                variant="outline"
+                color="neutral"
+                active={localSlots === o.value}
+                className="flex-1 text-[11px]"
+                onClick={() => setLocalSlots(o.value)}
+              >
+                {o.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         {count > 1 && (
           <div className="flex flex-col gap-1.5">
             <SectionLabel>Panels</SectionLabel>
-            <div className="flex flex-col gap-1">
-              {Array.from({ length: count }).map((_, i) => (
-                <label
-                  key={i}
-                  className="flex items-center justify-between gap-2 px-2 py-1.5 rounded border border-gray-200"
-                >
-                  <span className="text-xs text-gray-700">
+            <div className="flex flex-col gap-1.5">
+              {panels.map((cfg, i) => (
+                <div key={i} className="flex flex-col gap-1.5 px-2.5 py-2 rounded border border-gray-200">
+                  <span className="text-xs font-medium text-gray-700">
                     {pageRoleLabel(pageRoleForIndex(count, i))}
                   </span>
-                  <span className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <label className="flex items-center gap-1.5 text-xs text-gray-500">
                     <input
                       type="checkbox"
-                      checked={inverts[i] ?? false}
-                      onChange={(e) =>
-                        setInverts((prev) =>
-                          prev.map((v, j) => (j === i ? e.target.checked : v)),
-                        )
-                      }
+                      checked={cfg.inverted}
+                      onChange={(e) => setPanel(i, { inverted: e.target.checked })}
                     />
                     Prints upside-down
-                  </span>
-                </label>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <input
+                      type="checkbox"
+                      checked={cfg.tearaway}
+                      onChange={(e) => setPanel(i, { tearaway: e.target.checked })}
+                    />
+                    Tear-away (perforated stubs)
+                  </label>
+                  {cfg.tearaway && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500 pl-5">
+                      <span>Stubs</span>
+                      <div className="w-20">
+                        <NumberInput
+                          value={cfg.tearawayCount}
+                          onChange={(v) => setPanel(i, { tearawayCount: Math.max(1, v) })}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
