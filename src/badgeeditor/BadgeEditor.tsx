@@ -515,7 +515,12 @@ export function BadgeEditor({
 
           {previewMode ? (
             <div className="flex-1 min-h-0 overflow-hidden">
-              <BadgePreview doc={doc} data={previewData} />
+              <BadgePreview
+                doc={doc}
+                data={previewData}
+                showRulers={showRulers}
+                unit={unit}
+              />
             </div>
           ) : (
             <div

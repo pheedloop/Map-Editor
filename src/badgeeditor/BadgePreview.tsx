@@ -1,8 +1,11 @@
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { Stage, Layer, Rect, Group, Line } from "react-konva";
 import { useCanvasControls } from "../editor/hooks/useCanvasControls";
 import { StaticField, Slots, PPI, PANEL_CORNER_IN } from "./BadgeCanvas";
+import { BadgeRulers } from "./BadgeRulers";
 import { foldInvertForPage } from "./serialize";
+import { DPI } from "./model";
+import type { Unit } from "./units";
 import type { BadgeData } from "./badgeData";
 import type { BadgeDocument } from "./model";
 
@@ -15,9 +18,13 @@ import type { BadgeDocument } from "./model";
 export function BadgePreview({
   doc,
   data,
+  showRulers = false,
+  unit = "in",
 }: {
   doc: BadgeDocument;
   data: BadgeData | null;
+  showRulers?: boolean;
+  unit?: Unit;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const c = useCanvasControls(containerRef);
@@ -27,8 +34,21 @@ export function BadgePreview({
   const n = doc.pages.length;
   const totalH = panelH * n;
 
+  // On open, fit the full sheet in the viewport (centered, with a margin) rather
+  // than pinning it to the top-left — matching the editors and viewers.
+  const { fitToBounds, hasMeasured } = c;
+  const didFit = useRef(false);
+  useLayoutEffect(() => {
+    if (didFit.current || !hasMeasured) return;
+    didFit.current = true;
+    fitToBounds({ width: panelW, height: totalH }, { padding: 48, maxScale: 1 });
+  }, [hasMeasured, fitToBounds, panelW, totalH]);
+
   return (
-    <div ref={containerRef} className="w-full h-full overflow-hidden bg-gray-100">
+    <div
+      ref={containerRef}
+      className="relative w-full h-full overflow-hidden bg-gray-100"
+    >
       <Stage
         ref={c.stageRef}
         width={c.stageSize.width}
@@ -113,6 +133,14 @@ export function BadgePreview({
           })}
         </Layer>
       </Stage>
+      <BadgeRulers
+        visible={showRulers}
+        scale={c.scale}
+        position={c.position}
+        stageSize={c.stageSize}
+        ppi={DPI}
+        unit={unit}
+      />
     </div>
   );
 }
