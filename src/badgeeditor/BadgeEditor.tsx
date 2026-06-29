@@ -17,7 +17,8 @@ import {
 } from "../editor/components/ui";
 import { BadgeTopBar, modKey } from "./BadgeTopBar";
 import { BadgeCanvas } from "./BadgeCanvas";
-import { BadgeRulers, type RulerUnit } from "./BadgeRulers";
+import { BadgeRulers } from "./BadgeRulers";
+import { fmtUnit, unitLabel, type Unit } from "./units";
 import { BadgeSidebar } from "./BadgeSidebar";
 import { BadgePreview } from "./BadgePreview";
 import { BadgeSetupDialog, type PanelConfig } from "./BadgeSetupDialog";
@@ -51,9 +52,6 @@ export interface BadgeEditorProps {
    *  When omitted, the picker is hidden and fields show placeholders. */
   attendeeProvider?: AttendeeProvider;
 }
-
-/** Inches → compact string (trims trailing zeros): 4, 5.5, 2.85. */
-const fmtIn = (n: number) => String(+n.toFixed(2));
 
 /** Reference-grid spacing, in inches. */
 const GRID_SPACING_IN = 0.25;
@@ -106,7 +104,9 @@ export function BadgeEditor({
   const [showGrid, setShowGrid] = useState(false);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [showRulers, setShowRulers] = useState(true);
-  const [rulerUnit, setRulerUnit] = useState<RulerUnit>("in");
+  // User-facing measurement unit. The model stays inch-based internally; this
+  // only affects rulers, the setup dialog, and size readouts.
+  const [unit, setUnit] = useState<Unit>("in");
   const [showLayout, setShowLayout] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
@@ -435,11 +435,6 @@ export function BadgeEditor({
       onClick: () => setShowRulers((s) => !s),
     },
     {
-      label: `   Ruler Units: ${rulerUnit === "cm" ? "Centimeters" : "Inches"}`,
-      disabled: !showRulers,
-      onClick: () => setRulerUnit((u) => (u === "in" ? "cm" : "in")),
-    },
-    {
       label: `${showGrid ? "✓ " : "   "}Show Grid`,
       onClick: () => setShowGrid((s) => !s),
     },
@@ -552,7 +547,7 @@ export function BadgeEditor({
                 position={controls.position}
                 stageSize={controls.stageSize}
                 ppi={DPI}
-                unit={rulerUnit}
+                unit={unit}
               />
             </div>
           )}
@@ -560,13 +555,14 @@ export function BadgeEditor({
           <div className="relative z-20 flex items-center justify-between px-3 py-1.5 bg-white border-t border-gray-200 text-xs text-gray-500">
             <div className="flex items-center gap-2">
               <span>
-                Page {fmtIn(doc.panelSize.width)} ×{" "}
-                {fmtIn(doc.panelSize.height)}"
+                Page {fmtUnit(doc.panelSize.width, unit)} ×{" "}
+                {fmtUnit(doc.panelSize.height, unit)} {unitLabel[unit]}
               </span>
               <span className="text-gray-300">·</span>
               <span>
-                Badge {fmtIn(doc.panelSize.width)} ×{" "}
-                {fmtIn(doc.panelSize.height * doc.pages.length)}"
+                Badge {fmtUnit(doc.panelSize.width, unit)} ×{" "}
+                {fmtUnit(doc.panelSize.height * doc.pages.length, unit)}{" "}
+                {unitLabel[unit]}
               </span>
             </div>
             <IconButton
@@ -628,6 +624,8 @@ export function BadgeEditor({
           panelSize={doc.panelSize}
           pages={doc.pages}
           slots={doc.slots ?? "none"}
+          unit={unit}
+          onUnitChange={setUnit}
           onApply={applySetup}
           onClose={() => setShowSetup(false)}
         />

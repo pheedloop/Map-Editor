@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Button, Dialog, NumberInput, SectionLabel } from "../editor/components/ui";
 import {
+  fmtUnit,
+  fromUnit,
+  unitLabel,
+  unitMin,
+  unitName,
+  unitStep,
+  type Unit,
+} from "./units";
+import {
   PAGE_COUNT,
   pageRoleForIndex,
   pageRoleLabel,
@@ -36,6 +45,10 @@ interface BadgeSetupDialogProps {
   panelSize: { width: number; height: number };
   pages: BadgePage[];
   slots: SlotType;
+  /** Display/input unit. Panel sizes are stored in inches regardless. */
+  unit: Unit;
+  /** Change the editor's measurement unit (applies live). */
+  onUnitChange: (unit: Unit) => void;
   onApply: (
     fold: FoldType,
     panelSize: { width: number; height: number },
@@ -58,6 +71,8 @@ export function BadgeSetupDialog({
   panelSize,
   pages,
   slots,
+  unit,
+  onUnitChange,
   onApply,
   onClose,
 }: BadgeSetupDialogProps) {
@@ -84,8 +99,6 @@ export function BadgeSetupDialog({
 
   const setPanel = (i: number, patch: Partial<PanelConfig>) =>
     setPanels((prev) => prev.map((p, j) => (j === i ? { ...p, ...patch } : p)));
-
-  const totalHeight = +(h * count).toFixed(4);
 
   return (
     <Dialog
@@ -132,13 +145,34 @@ export function BadgeSetupDialog({
           </span>
         </div>
 
+        <div className="flex flex-col gap-1.5">
+          <SectionLabel>Units</SectionLabel>
+          <div className="flex gap-2">
+            {(["in", "cm"] as Unit[]).map((u) => (
+              <Button
+                key={u}
+                variant="outline"
+                color="neutral"
+                active={unit === u}
+                className="flex-1"
+                onClick={() => onUnitChange(u)}
+              >
+                {unitName[u]}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex gap-3">
-          <InchField label="Panel width" value={w} onChange={setW} />
-          <InchField label="Panel height" value={h} onChange={setH} />
+          <DimField label="Panel width" value={w} unit={unit} onChange={setW} />
+          <DimField label="Panel height" value={h} unit={unit} onChange={setH} />
         </div>
 
         <div className="text-xs text-gray-500">
-          Prints as <span className="font-medium text-gray-700">{+w.toFixed(2)} × {totalHeight} in</span>
+          Prints as{" "}
+          <span className="font-medium text-gray-700">
+            {fmtUnit(w, unit)} × {fmtUnit(h * count, unit)} {unitLabel[unit]}
+          </span>
           {count > 1 && " (unfolded)"}
         </div>
 
@@ -206,29 +240,46 @@ export function BadgeSetupDialog({
   );
 }
 
-/** Fractional-inch input (NumberInput rounds to integers, so not usable here). */
-function InchField({
+/**
+ * Fractional dimension input (NumberInput rounds to integers, so not usable
+ * here). The stored `value` is always inches; the field displays and accepts
+ * the current `unit` and converts back to inches on change.
+ */
+function DimField({
   label,
   value,
+  unit,
   onChange,
 }: {
   label: string;
+  /** Value in inches. */
   value: number;
-  onChange: (v: number) => void;
+  unit: Unit;
+  /** Reports the new value in inches. */
+  onChange: (inches: number) => void;
 }) {
-  const [text, setText] = useState(String(value));
+  // Track the raw text so partial edits (e.g. "2.") aren't clobbered, and reset
+  // it whenever the unit or stored value changes.
+  const [text, setText] = useState(fmtUnit(value, unit, 3));
+  const [editingUnit, setEditingUnit] = useState(unit);
+  if (editingUnit !== unit) {
+    setEditingUnit(unit);
+    setText(fmtUnit(value, unit, 3));
+  }
   return (
     <label className="flex-1 flex flex-col gap-1.5">
-      <SectionLabel>{label} (in)</SectionLabel>
+      <SectionLabel>
+        {label} ({unitLabel[unit]})
+      </SectionLabel>
       <input
         type="number"
-        step={0.05}
-        min={0.5}
+        step={unitStep[unit]}
+        min={unitMin[unit]}
         value={text}
         onChange={(e) => {
           setText(e.target.value);
           const n = Number(e.target.value);
-          if (!Number.isNaN(n) && n > 0) onChange(n);
+          if (!Number.isNaN(n) && n > 0) onChange(fromUnit(n, unit));
         }}
         className="w-full px-2 py-1 text-xs border border-gray-200 rounded bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />

@@ -1,16 +1,13 @@
 import { useRef, useEffect } from "react";
+import { toUnit, type Unit } from "./units";
 
-// Inch-based rulers for the badge canvas. The badge coordinate system is
-// 1 inch = `ppi` canvas px at scale 1, so screen px per inch = scale * ppi.
-// Adapted from the map editor's Rulers (which is bound to the ft/m/px Unit type
-// and so can't be reused directly for inches).
+// Rulers for the badge canvas. The badge coordinate system is 1 inch = `ppi`
+// canvas px at scale 1; values are shown in the chosen display unit. Adapted
+// from the map editor's Rulers (which is bound to the ft/m/px Unit type and so
+// can't be reused directly here).
 
-export type RulerUnit = "in" | "cm";
-
-/** Display units per inch — the badge model is inch-based internally. */
-const UNITS_PER_INCH: Record<RulerUnit, number> = { in: 1, cm: 2.54 };
 /** Minor ticks per major tick (¼" for inches, mm-friendly fifths for cm). */
-const MINOR_DIVISOR: Record<RulerUnit, number> = { in: 4, cm: 5 };
+const MINOR_DIVISOR: Record<Unit, number> = { in: 4, cm: 5 };
 
 interface BadgeRulersProps {
   visible: boolean;
@@ -20,7 +17,7 @@ interface BadgeRulersProps {
   /** Canvas px per inch at scale 1 (DPI). */
   ppi: number;
   /** Display unit — inches or centimeters. */
-  unit: RulerUnit;
+  unit: Unit;
 }
 
 const RULER_SIZE = 22;
@@ -68,7 +65,7 @@ function drawHorizontal(
   scale: number,
   positionX: number,
   ppi: number,
-  unit: RulerUnit,
+  unit: Unit,
 ) {
   const cssWidth = canvas.parentElement?.clientWidth ?? canvas.clientWidth;
   const cssHeight = RULER_SIZE;
@@ -82,7 +79,7 @@ function drawHorizontal(
   ctx.lineTo(cssWidth, cssHeight - 0.5);
   ctx.stroke();
 
-  const pxPerIn = (scale * ppi) / UNITS_PER_INCH[unit];
+  const pxPerIn = (scale * ppi) / toUnit(1, unit);
   const majorInterval = niceInterval(MAJOR_TICK_MIN_PX / pxPerIn);
   const minorInterval = majorInterval / MINOR_DIVISOR[unit];
 
@@ -131,7 +128,7 @@ function drawVertical(
   scale: number,
   positionY: number,
   ppi: number,
-  unit: RulerUnit,
+  unit: Unit,
 ) {
   const cssWidth = RULER_SIZE;
   const cssHeight = canvas.parentElement?.clientHeight ?? canvas.clientHeight;
@@ -145,7 +142,7 @@ function drawVertical(
   ctx.lineTo(cssWidth - 0.5, cssHeight);
   ctx.stroke();
 
-  const pxPerIn = (scale * ppi) / UNITS_PER_INCH[unit];
+  const pxPerIn = (scale * ppi) / toUnit(1, unit);
   const majorInterval = niceInterval(MAJOR_TICK_MIN_PX / pxPerIn);
   const minorInterval = majorInterval / MINOR_DIVISOR[unit];
 
