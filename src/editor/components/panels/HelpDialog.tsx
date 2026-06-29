@@ -10,6 +10,7 @@ const shortcuts: { category: string; items: { keys: string; description: string 
   {
     category: "Tools",
     items: [
+      { keys: "H", description: "Hand tool (drag to pan)" },
       { keys: "V", description: "Select tool" },
       { keys: "R", description: "Rectangle tool" },
       { keys: "O", description: "Ellipse tool" },
@@ -57,6 +58,7 @@ const shortcuts: { category: string; items: { keys: string; description: string 
     category: "Canvas",
     items: [
       { keys: "Scroll", description: "Zoom in/out" },
+      { keys: "H, then Drag", description: "Pan canvas (hand tool)" },
       { keys: "Space + Drag", description: "Pan canvas" },
       { keys: "Shift + Drag", description: "Constrain proportions (square/circle)" },
       { keys: "Shift + Rotate", description: "Snap rotation to 15°" },

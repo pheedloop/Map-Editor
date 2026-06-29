@@ -106,7 +106,11 @@ export function useKeyboardShortcuts({
 
       const key = e.key.toLowerCase();
 
-      // Hardcoded shortcuts: select, escape, delete
+      // Hardcoded shortcuts: hand, select, escape, delete
+      if (key === "h") {
+        setActiveTool("hand");
+        return;
+      }
       if (key === "v") {
         setActiveTool("select");
         return;

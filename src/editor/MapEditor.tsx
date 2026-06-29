@@ -173,7 +173,9 @@ export function MapEditor({
     DEFAULT_LAYERS.map((l) => ({ ...l })),
   );
   const [activeLayerId, _setActiveLayerId] = useState<LayerId>("content");
-  const [activeTool, setActiveTool] = useState<ActiveTool>("select");
+  // Default to the hand (pan) tool so the first interaction is dragging to move
+  // around the canvas — early users found the old pan behavior confusing.
+  const [activeTool, setActiveTool] = useState<ActiveTool>("hand");
   const [editorMode, setEditorMode] = useState<EditorMode>("design");
   const placementRecords = usePlacementRecords(data, placementCategories);
 
@@ -1756,6 +1758,10 @@ export function MapEditor({
                 <Canvas
                   data={data}
                   activeTool={resolvedTool}
+                  // The hand tool lives in the design toolbar; in placement mode
+                  // the canvas stays selectable so placed objects can be moved
+                  // (Space / middle-mouse still pan).
+                  isPanTool={activeTool === "hand" && editorMode === "design"}
                   toolContext={toolContext}
                   selectedIds={selectedIds}
                   scale={scale}

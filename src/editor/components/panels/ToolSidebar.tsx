@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   PiCursorFill,
+  PiHandFill,
   PiPaintBrush,
   PiEraser,
   PiSquare,
@@ -34,6 +35,13 @@ interface ToolDef<T extends string> {
 // ---------------------------------------------------------------------------
 // Tool lists
 // ---------------------------------------------------------------------------
+
+const handDef: ToolDef<ActiveTool> = {
+  id: "hand",
+  label: "Hand (pan)",
+  shortcut: "H",
+  icon: <PiHandFill size={16} />,
+};
 
 const selectDef: ToolDef<ActiveTool> = {
   id: "select",
@@ -335,6 +343,11 @@ export function ToolSidebar({
       {/* Tab content */}
       {editorMode === "design" ? (
         <div className="flex-1 overflow-y-auto py-1 px-1">
+          <ToolRow
+            tool={handDef}
+            isActive={activeTool === "hand"}
+            onClick={() => onToolChange("hand")}
+          />
           <ToolRow
             tool={selectDef}
             isActive={activeTool === "select"}

@@ -1,4 +1,4 @@
-export type ActiveTool = "select" | "rectangle" | "ellipse" | "line" | "arrow" | "arc" | "polygon" | "text" | "icon" | "measure";
+export type ActiveTool = "hand" | "select" | "rectangle" | "ellipse" | "line" | "arrow" | "arc" | "polygon" | "text" | "icon" | "measure";
 
 export type EditorMode = "design" | "placement";
 

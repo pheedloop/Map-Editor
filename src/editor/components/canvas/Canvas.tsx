@@ -67,6 +67,8 @@ interface CanvasProps {
   data: FloorPlanData;
   /** null = select mode (built-in), otherwise the active registry tool */
   activeTool: ToolDefinition | null;
+  /** Hand tool active — drag pans the canvas; clicks neither select nor draw. */
+  isPanTool?: boolean;
   toolContext: ToolContext;
   selectedIds: Set<string>;
   scale: number;
@@ -127,6 +129,7 @@ interface CanvasProps {
 export function Canvas({
   data,
   activeTool,
+  isPanTool = false,
   toolContext,
   selectedIds,
   scale,
@@ -169,10 +172,15 @@ export function Canvas({
   onDoubleClick,
   onGroupTransformEnd,
 }: CanvasProps) {
-  const isSelectMode = activeTool === null;
+  // Hand tool and select mode are mutually exclusive built-in (non-drawing)
+  // modes. Hand pans on drag; select rubber-bands / moves elements.
+  const isSelectMode = activeTool === null && !isPanTool;
 
   // Track Space key for pan mode
   const [spaceHeld, setSpaceHeld] = useState(false);
+  // True while the stage itself is being dragged (pan) — for the grab/grabbing
+  // cursor swap.
+  const [isStageDragging, setIsStageDragging] = useState(false);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === "Space" && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
@@ -191,7 +199,8 @@ export function Canvas({
     };
   }, []);
 
-  const isPanMode = spaceHeld;
+  // Hold Space, or activate the hand tool, to pan by dragging.
+  const isPanMode = spaceHeld || isPanTool;
 
   // Hover state (select mode only)
   const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
@@ -633,7 +642,7 @@ export function Canvas({
   );
 
   // --- Cursor ---
-  const cursor = isMiddlePanning
+  const cursor = isMiddlePanning || (isPanMode && isStageDragging)
     ? "grabbing"
     : isPanMode
     ? "grab"
@@ -663,7 +672,13 @@ export function Canvas({
         y={position.y}
         draggable={isPanMode || (!isPathingMode && isSelectMode && !dragSelectOrigin.current)}
         onWheel={onWheel}
-        onDragEnd={onDragEnd}
+        onDragStart={(e) => {
+          if (e.target === stageRef.current) setIsStageDragging(true);
+        }}
+        onDragEnd={(e) => {
+          if (e.target === stageRef.current) setIsStageDragging(false);
+          onDragEnd(e);
+        }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
