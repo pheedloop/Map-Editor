@@ -29,8 +29,8 @@ function App() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  if (product === "seatplanner") return <SeatplannerApp />;
-  if (product === "badge") return <BadgeEditorApp />;
+  if (product === "seatplans") return <SeatplannerApp />;
+  if (product === "badges") return <BadgeEditorApp />;
   return <MapApp />;
 }
 

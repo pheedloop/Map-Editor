@@ -3,13 +3,13 @@
 // ---------------------------------------------------------------------------
 //
 // The demo hosts multiple products side by side. The product lives in the URL
-// path (`/map`, `/seatplanner`); the mode within a product lives in the hash
+// path (`/maps`, `/seatplans`); the mode within a product lives in the hash
 // (`#editor`, `#viewer`, ...). App.tsx resolves the product and delegates to
 // that product's self-contained route module, which owns its own hash routing.
 
-export type Product = "map" | "seatplanner" | "badge";
+export type Product = "maps" | "seatplans" | "badges";
 
-export const DEFAULT_PRODUCT: Product = "map";
+export const DEFAULT_PRODUCT: Product = "maps";
 
 /** Deploy base path — "/" in dev, "/Map-Editor/" on GitHub Pages. */
 export const BASE_URL = import.meta.env.BASE_URL;
@@ -21,8 +21,8 @@ export function getProduct(): Product {
     path = path.slice(BASE_URL.length);
   }
   const seg = path.replace(/^\/+/, "").split("/")[0];
-  if (seg === "seatplanner") return "seatplanner";
-  if (seg === "badge") return "badge";
+  if (seg === "seatplans") return "seatplans";
+  if (seg === "badges") return "badges";
   return DEFAULT_PRODUCT;
 }
 

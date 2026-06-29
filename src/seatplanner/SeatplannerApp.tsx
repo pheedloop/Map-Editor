@@ -34,7 +34,7 @@ export function SeatplannerApp() {
   return (
     <div className="h-screen flex flex-col">
       <nav className="flex items-center gap-1 px-3 py-1.5 bg-gray-900 text-xs shrink-0">
-        <ProductSwitcher current="seatplanner" mode={mode} />
+        <ProductSwitcher current="seatplans" mode={mode} />
         <div className="w-px h-4 bg-gray-700 mx-1" />
         {modeTab("editor", "Editor")}
         {modeTab("viewer", "Viewer")}
