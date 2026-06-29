@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { v4 as uuid } from "uuid";
 import { useCanvasControls } from "../editor/hooks/useCanvasControls";
 import { useHistory } from "../editor/hooks/useHistory";
@@ -20,6 +27,7 @@ import { flatten, foldInvertForPage } from "./serialize";
 import { createSampleDocument } from "./sample";
 import type { AttendeeOption, AttendeeProvider, BadgeData } from "./badgeData";
 import {
+  DPI,
   PAGE_COUNT,
   pageRoleForIndex,
   pageRoleLabel,
@@ -114,6 +122,26 @@ export function BadgeEditor({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const controls = useCanvasControls(containerRef);
+
+  // Center the badge in the canvas (with a margin), scaling down large badges to
+  // fit — used for the initial load and the zoom-reset button, so neither pins
+  // the badge to the top-left corner.
+  const { fitToBounds, hasMeasured } = controls;
+  const fitBadge = useCallback(() => {
+    fitToBounds(
+      { width: doc.panelSize.width * DPI, height: doc.panelSize.height * DPI },
+      { padding: 56, maxScale: 1 },
+    );
+  }, [fitToBounds, doc.panelSize.width, doc.panelSize.height]);
+
+  // On first load, fit once the viewport has been measured. useLayoutEffect so
+  // the fit is applied before the browser paints (no zoom/pan flash).
+  const didFit = useRef(false);
+  useLayoutEffect(() => {
+    if (didFit.current || !hasMeasured) return;
+    didFit.current = true;
+    fitBadge();
+  }, [hasMeasured, fitBadge]);
 
   // Active page (clamped — fold changes can shrink the page count).
   const pageIndex = Math.min(activePageIndex, doc.pages.length - 1);
@@ -499,9 +527,9 @@ export function BadgeEditor({
             </div>
             <IconButton
               size="sm"
-              onClick={controls.zoomReset}
+              onClick={fitBadge}
               className="px-2 w-auto text-xs text-gray-500"
-              title="Click to reset zoom"
+              title="Click to fit badge in view"
             >
               {Math.round(controls.scale * 100)}%
             </IconButton>

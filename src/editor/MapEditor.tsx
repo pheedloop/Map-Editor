@@ -1,4 +1,11 @@
-import { useRef, useState, useCallback, useMemo, useEffect } from "react";
+import {
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+} from "react";
 import type { ActiveTool, EditorMode, PathingTool } from "./types";
 import { usePlacementRecords } from "./hooks/usePlacementRecords";
 import {
@@ -333,10 +340,24 @@ export function MapEditor({
     position,
     setPosition,
     stageSize,
+    hasMeasured,
+    fitToBounds,
     handleWheel,
     handleDragEnd,
     zoomReset,
   } = useCanvasControls(containerRef);
+
+  // On first load, fit the whole map in the viewport (centered, with a margin)
+  // rather than pinning it to the top-left, scaling large maps down to fit.
+  const didInitialFit = useRef(false);
+  useLayoutEffect(() => {
+    if (didInitialFit.current || !hasMeasured) return;
+    didInitialFit.current = true;
+    fitToBounds(
+      { width: data.dimensions.width, height: data.dimensions.height },
+      { padding: 64, maxScale: 1 },
+    );
+  }, [hasMeasured, fitToBounds, data.dimensions.width, data.dimensions.height]);
 
   // Derived selection helpers
   const selectedElements = useMemo(
