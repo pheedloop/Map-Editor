@@ -13,6 +13,7 @@ import {
 } from "react-konva";
 import type Konva from "konva";
 import { DPI, type BadgeField, type BadgePage, type SlotType } from "./model";
+import { GridLayer } from "../editor/components/canvas/GridLayer";
 import { fieldDisplayText } from "./factory";
 import { fieldSizePx, useBadgeGuides } from "./useBadgeGuides";
 import {
@@ -94,6 +95,12 @@ interface BadgeCanvasProps {
   /** Fold edges connecting to adjacent panels (multi-page badges). */
   foldTop: boolean;
   foldBottom: boolean;
+  /** Draw a reference grid over the panel. */
+  showGrid: boolean;
+  /** Snap dragged fields to grid increments. */
+  snapToGrid: boolean;
+  /** Grid spacing in canvas px (inch spacing × PPI). */
+  gridSpacingPx: number;
   selectedIds: Set<string>;
   /** mousedown on a field — additive = shift held. */
   onFieldMouseDown: (id: string, additive: boolean) => void;
@@ -120,6 +127,9 @@ export function BadgeCanvas({
   isFrontPage,
   foldTop,
   foldBottom,
+  showGrid,
+  snapToGrid,
+  gridSpacingPx,
   selectedIds,
   onFieldMouseDown,
   onClearSelection,
@@ -304,21 +314,37 @@ export function BadgeCanvas({
     }
   };
 
+  const snapToGridPx = (v: number) =>
+    snapToGrid && gridSpacingPx > 0
+      ? Math.round(v / gridSpacingPx) * gridSpacingPx
+      : v;
+
   const handleFieldDragMove = (id: string, node: Konva.Node) => {
     if (dragStarts.current.size <= 1) {
       const field = page.fields.find((f) => f.id === id);
       if (!field) return;
       const { w, h } = fieldSizePx(field);
-      const { x, y } = snap(id, node.x(), node.y(), w, h);
+      // Grid snap first; alignment guides then refine when near other fields.
+      const { x, y } = snap(
+        id,
+        snapToGridPx(node.x()),
+        snapToGridPx(node.y()),
+        w,
+        h,
+      );
       node.x(x);
       node.y(y);
       return;
     }
-    // Multi-move: shift every other selected node by the same delta.
+    // Multi-move: snap the lead node to grid, then shift the rest by that delta.
     const start = dragStarts.current.get(id);
     if (!start) return;
-    const dx = node.x() - start.x;
-    const dy = node.y() - start.y;
+    const nx = snapToGridPx(node.x());
+    const ny = snapToGridPx(node.y());
+    node.x(nx);
+    node.y(ny);
+    const dx = nx - start.x;
+    const dy = ny - start.y;
     dragStarts.current.forEach((s, fid) => {
       if (fid === id) return;
       const n = nodeRefs.current.get(fid);
@@ -398,6 +424,17 @@ export function BadgeCanvas({
           shadowBlur={12}
           shadowOffsetY={2}
         />
+
+        {/* Reference grid (editor-only) */}
+        {showGrid && gridSpacingPx > 0 && (
+          <GridLayer
+            width={panelW}
+            height={panelH}
+            spacing={gridSpacingPx}
+            color="#94a3b8"
+            opacity={0.35}
+          />
+        )}
 
         {/* Lanyard slots — front panel only (static; editor-only) */}
         {isFrontPage && slots !== "none" && (

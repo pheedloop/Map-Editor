@@ -1,4 +1,12 @@
-import { useRef, useState, useCallback, useMemo, useEffect } from "react";
+import {
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+} from "react";
+import { MdOutlineTableBar } from "react-icons/md";
 import type { ActiveTool, EditorMode, PathingTool } from "./types";
 import { usePlacementRecords } from "./hooks/usePlacementRecords";
 import {
@@ -166,7 +174,9 @@ export function MapEditor({
     DEFAULT_LAYERS.map((l) => ({ ...l })),
   );
   const [activeLayerId, _setActiveLayerId] = useState<LayerId>("content");
-  const [activeTool, setActiveTool] = useState<ActiveTool>("select");
+  // Default to the hand (pan) tool so the first interaction is dragging to move
+  // around the canvas — early users found the old pan behavior confusing.
+  const [activeTool, setActiveTool] = useState<ActiveTool>("hand");
   const [editorMode, setEditorMode] = useState<EditorMode>("design");
   const placementRecords = usePlacementRecords(data, placementCategories);
 
@@ -252,6 +262,9 @@ export function MapEditor({
         initWalkableGrid();
         setActivePathingTool("select");
       }
+      // No drawing tools on the background layer — drop back to Select so a
+      // previously-picked drawing tool isn't left active (and inert) there.
+      if (id === "background") setActiveTool("select");
     },
     [initWalkableGrid, featureMap.wayfinding],
   );
@@ -333,10 +346,24 @@ export function MapEditor({
     position,
     setPosition,
     stageSize,
+    hasMeasured,
+    fitToBounds,
     handleWheel,
     handleDragEnd,
     zoomReset,
   } = useCanvasControls(containerRef);
+
+  // On first load, fit the whole map in the viewport (centered, with a margin)
+  // rather than pinning it to the top-left, scaling large maps down to fit.
+  const didInitialFit = useRef(false);
+  useLayoutEffect(() => {
+    if (didInitialFit.current || !hasMeasured) return;
+    didInitialFit.current = true;
+    fitToBounds(
+      { width: data.dimensions.width, height: data.dimensions.height },
+      { padding: 64, maxScale: 1 },
+    );
+  }, [hasMeasured, fitToBounds, data.dimensions.width, data.dimensions.height]);
 
   // Derived selection helpers
   const selectedElements = useMemo(
@@ -628,9 +655,14 @@ export function MapEditor({
   );
 
   // --- Tool registry integration ---
-  // Resolve active tool string to ToolDefinition (null = select mode)
+  // Resolve active tool string to ToolDefinition (null = select mode). The
+  // background layer holds only the background image/color, so drawing tools
+  // don't apply there — force select mode so shapes can't be drawn into a layer
+  // that never renders them.
   const resolvedTool =
-    activeTool === "select" ? null : (TOOL_MAP.get(activeTool) ?? null);
+    activeTool === "select" || activeLayerId === "background"
+      ? null
+      : (TOOL_MAP.get(activeTool) ?? null);
 
   // Unified tool completion handler (used once tools are migrated to registry)
   const handleToolComplete = useCallback(
@@ -887,27 +919,6 @@ export function MapEditor({
 
     for (const action of config.contextMenu) {
       switch (action) {
-        case "convertToObject":
-          // Offer a conversion to every placement category except the element's
-          // own type — so the available conversions follow the active variant.
-          for (const group of placementRecords) {
-            const { category } = group;
-            if (category.elementType === element.type) continue;
-            items.push({
-              label: category.convertLabel,
-              onClick: () =>
-                updateElementType(contextMenu.elementId, category.elementType, {
-                  color: category.convertColor,
-                }),
-            });
-          }
-          break;
-        case "convertToShape":
-          items.push({
-            label: "Convert to Shape",
-            onClick: () => updateElementType(contextMenu.elementId, "shape"),
-          });
-          break;
         case "delete":
           items.push({
             label: "Delete",
@@ -1615,6 +1626,7 @@ export function MapEditor({
           onToolChange={handleToolChange}
           onIconSelect={(iconId) => setActiveIconName(iconId)}
           isPathingMode={activeLayerId === "pathing"}
+          isBackgroundLayer={activeLayerId === "background"}
           activePathingTool={activePathingTool}
           onPathingToolChange={setActivePathingTool}
           // If the tier locks objects, fall back to design mode so the
@@ -1630,6 +1642,13 @@ export function MapEditor({
           placementRecords={placementRecords}
           onAutoArrange={handleAutoArrange}
           features={featureMap}
+          // Seatplanner places tables; the map product places booths (default).
+          placementIcon={
+            placementCategories.length > 0 &&
+            placementCategories.every((c) => c.elementType === "table") ? (
+              <MdOutlineTableBar size={16} />
+            ) : undefined
+          }
         />
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           {isPathingMode ? (
@@ -1735,6 +1754,10 @@ export function MapEditor({
                 <Canvas
                   data={data}
                   activeTool={resolvedTool}
+                  // The hand tool lives in the design toolbar; in placement mode
+                  // the canvas stays selectable so placed objects can be moved
+                  // (Space / middle-mouse still pan).
+                  isPanTool={activeTool === "hand" && editorMode === "design"}
                   toolContext={toolContext}
                   selectedIds={selectedIds}
                   scale={scale}
@@ -1884,7 +1907,6 @@ export function MapEditor({
                 }
                 selectNone();
               }}
-              onConvertToBooth={(id) => updateElementType(id, "booth")}
               onBackgroundOpacityChange={(opacity) =>
                 data.backgroundImage &&
                 setBackgroundImage({ ...data.backgroundImage, opacity })

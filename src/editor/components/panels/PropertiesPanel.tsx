@@ -43,7 +43,6 @@ interface PropertiesPanelProps {
   onBatchUpdateProperties: (updates: Partial<ElementProperties>) => void;
   onUpdateGeometry: (id: string, updates: Partial<Geometry>) => void;
   onDelete: (id: string) => void;
-  onConvertToBooth?: (id: string) => void;
   onBackgroundOpacityChange?: (opacity: number) => void;
   onRemoveBackground?: () => void;
   onUploadBackground?: () => void;
@@ -149,7 +148,6 @@ export function PropertiesPanel({
   onBatchUpdateProperties,
   onUpdateGeometry,
   onDelete,
-  onConvertToBooth,
   onBackgroundOpacityChange,
   onRemoveBackground,
   onUploadBackground,
@@ -390,7 +388,6 @@ export function PropertiesPanel({
   const config = getToolUIConfig(geo.shape, element.type);
   const fields = new Set<PropertiesPanelField>(config.propertiesPanel);
   const dims = getDimensions(element);
-  const canConvertToBooth = element.type === "shape" && geo.shape === "rect";
 
   const handleWidthChange = (w: number) => {
     if (w <= 0) return;
@@ -730,16 +727,6 @@ export function PropertiesPanel({
       )}
 
       <div className="flex flex-col gap-2 p-3 border-t border-gray-200">
-        {canConvertToBooth && (
-          <Button
-            variant="outline"
-            color="primary"
-            className="w-full"
-            onClick={() => onConvertToBooth?.(element.id)}
-          >
-            Convert to Booth
-          </Button>
-        )}
         {(element.type === "booth" ||
           element.type === "session_area" ||
           element.type === "meeting_room") && (

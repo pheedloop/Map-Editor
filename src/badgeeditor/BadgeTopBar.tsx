@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { PiIdentificationBadge, PiQuestion, PiBug } from "react-icons/pi";
+import { useState, type ReactNode } from "react";
+import { PiIdentificationBadge, PiBug } from "react-icons/pi";
 import { DropdownMenu, MenuButton } from "../editor/components/ui";
 import type { MenuEntry } from "../editor/components/ui";
 
@@ -9,7 +9,9 @@ export const modKey = isMac ? "⌘" : "Ctrl+";
 interface BadgeTopBarProps {
   fileMenuItems?: MenuEntry[];
   editMenuItems?: MenuEntry[];
-  onHelpClick?: () => void;
+  viewMenuItems?: MenuEntry[];
+  /** Right-aligned controls (e.g. preview-data picker + full-preview toggle). */
+  rightActions?: ReactNode;
   /** When true, shows the debug affordance (badge_layout JSON viewer). */
   debug?: boolean;
   onDebugClick?: () => void;
@@ -23,7 +25,8 @@ interface BadgeTopBarProps {
 export function BadgeTopBar({
   fileMenuItems = [],
   editMenuItems = [],
-  onHelpClick,
+  viewMenuItems = [],
+  rightActions,
   debug,
   onDebugClick,
 }: BadgeTopBarProps) {
@@ -53,10 +56,11 @@ export function BadgeTopBar({
       </div>
       {menu("file", "File", fileMenuItems)}
       {menu("edit", "Edit", editMenuItems)}
+      {menu("view", "View", viewMenuItems)}
       <div className="flex-1" />
-      <MenuButton onClick={onHelpClick} title="Help & Shortcuts">
-        <PiQuestion size={16} />
-      </MenuButton>
+      {rightActions && (
+        <div className="flex items-center gap-3 px-3">{rightActions}</div>
+      )}
       {debug && (
         <MenuButton onClick={onDebugClick} title="Debug: View badge_layout JSON">
           <PiBug size={16} />

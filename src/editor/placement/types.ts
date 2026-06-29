@@ -36,10 +36,6 @@ export interface PlacementCategory<T = unknown> {
   getSecondaryLabel?: (record: T) => string | null;
   /** Extra element properties to apply when a record is placed (e.g. capacity). */
   getExtraProps?: (record: T) => Partial<ElementProperties>;
-
-  // Convert-to-object context menu entry
-  convertLabel: string;
-  convertColor: string;
 }
 
 /**

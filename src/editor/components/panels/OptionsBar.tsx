@@ -1,4 +1,5 @@
-import { Button, ColorSwatch, IconButton, NumberInput } from "../ui";
+import { Button, ColorSwatch, NumberInput } from "../ui";
+import { AlignmentControls } from "./AlignmentControls";
 import type { OptionsBarField } from "../canvas/elements/types";
 
 export interface DrawingDefaults {
@@ -110,50 +111,16 @@ export function OptionsBar({
         <>
           <div className="w-px h-4 bg-gray-200 shrink-0" />
           <div className="flex items-center gap-0.5">
-            {onAlignLeft && (
-              <IconButton size="sm" title="Align left edges" onClick={onAlignLeft}>
-                <AlignLeftIcon />
-              </IconButton>
-            )}
-            {onAlignCenterH && (
-              <IconButton size="sm" title="Align horizontal centers" onClick={onAlignCenterH}>
-                <AlignCenterHIcon />
-              </IconButton>
-            )}
-            {onAlignRight && (
-              <IconButton size="sm" title="Align right edges" onClick={onAlignRight}>
-                <AlignRightIcon />
-              </IconButton>
-            )}
-            <div className="w-px h-3.5 bg-gray-200 shrink-0 mx-0.5" />
-            {onAlignTop && (
-              <IconButton size="sm" title="Align top edges" onClick={onAlignTop}>
-                <AlignTopIcon />
-              </IconButton>
-            )}
-            {onAlignCenterV && (
-              <IconButton size="sm" title="Align vertical centers" onClick={onAlignCenterV}>
-                <AlignCenterVIcon />
-              </IconButton>
-            )}
-            {onAlignBottom && (
-              <IconButton size="sm" title="Align bottom edges" onClick={onAlignBottom}>
-                <AlignBottomIcon />
-              </IconButton>
-            )}
-            {(onDistributeH || onDistributeV) && (
-              <div className="w-px h-3.5 bg-gray-200 shrink-0 mx-0.5" />
-            )}
-            {onDistributeH && (
-              <IconButton size="sm" title="Distribute horizontally" onClick={onDistributeH}>
-                <DistributeHIcon />
-              </IconButton>
-            )}
-            {onDistributeV && (
-              <IconButton size="sm" title="Distribute vertically" onClick={onDistributeV}>
-                <DistributeVIcon />
-              </IconButton>
-            )}
+            <AlignmentControls
+              onAlignLeft={onAlignLeft}
+              onAlignCenterH={onAlignCenterH}
+              onAlignRight={onAlignRight}
+              onAlignTop={onAlignTop}
+              onAlignCenterV={onAlignCenterV}
+              onAlignBottom={onAlignBottom}
+              onDistributeH={onDistributeH}
+              onDistributeV={onDistributeV}
+            />
             {onArrangeAsGrid && (
               <>
                 <div className="w-px h-3.5 bg-gray-200 shrink-0 mx-0.5" />
@@ -166,87 +133,5 @@ export function OptionsBar({
         </>
       )}
     </div>
-  );
-}
-
-function AlignLeftIcon() {
-  return (
-    <svg viewBox="0 0 14 14" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-      <line x1="2" y1="1.5" x2="2" y2="12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="3.5" y="2.5" width="7" height="3.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-      <rect x="3.5" y="8" width="4.5" height="3.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
-
-function AlignCenterHIcon() {
-  return (
-    <svg viewBox="0 0 14 14" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-      <line x1="7" y1="1.5" x2="7" y2="12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="3.5" y="2.5" width="7" height="3.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-      <rect x="4.75" y="8" width="4.5" height="3.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
-
-function AlignRightIcon() {
-  return (
-    <svg viewBox="0 0 14 14" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-      <line x1="12" y1="1.5" x2="12" y2="12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="3.5" y="2.5" width="7" height="3.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-      <rect x="6" y="8" width="4.5" height="3.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
-
-function AlignTopIcon() {
-  return (
-    <svg viewBox="0 0 14 14" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-      <line x1="1.5" y1="2" x2="12.5" y2="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="2.5" y="3.5" width="3.5" height="7" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-      <rect x="8" y="3.5" width="3.5" height="4.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
-
-function AlignCenterVIcon() {
-  return (
-    <svg viewBox="0 0 14 14" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-      <line x1="1.5" y1="7" x2="12.5" y2="7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="2.5" y="3.5" width="3.5" height="7" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-      <rect x="8" y="4.75" width="3.5" height="4.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
-
-function AlignBottomIcon() {
-  return (
-    <svg viewBox="0 0 14 14" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-      <line x1="1.5" y1="12" x2="12.5" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="2.5" y="3.5" width="3.5" height="7" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-      <rect x="8" y="6" width="3.5" height="4.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
-
-function DistributeHIcon() {
-  return (
-    <svg viewBox="0 0 14 14" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-      <line x1="1.5" y1="1.5" x2="1.5" y2="12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="12.5" y1="1.5" x2="12.5" y2="12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="3.5" y="4" width="2.5" height="6" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-      <rect x="8" y="4" width="2.5" height="6" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
-
-function DistributeVIcon() {
-  return (
-    <svg viewBox="0 0 14 14" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-      <line x1="1.5" y1="1.5" x2="12.5" y2="1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="1.5" y1="12.5" x2="12.5" y2="12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="4" y="3.5" width="6" height="2.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-      <rect x="4" y="8" width="6" height="2.5" rx="0.5" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
-    </svg>
   );
 }

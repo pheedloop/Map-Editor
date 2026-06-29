@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { v4 as uuid } from "uuid";
 import { useCanvasControls } from "../editor/hooks/useCanvasControls";
 import { useHistory } from "../editor/hooks/useHistory";
@@ -10,6 +17,20 @@ import {
 } from "../editor/components/ui";
 import { BadgeTopBar, modKey } from "./BadgeTopBar";
 import { BadgeCanvas } from "./BadgeCanvas";
+import { BadgeRulers } from "./BadgeRulers";
+import { AlignmentControls } from "../editor/components/panels/AlignmentControls";
+import {
+  alignLeft,
+  alignCenterH,
+  alignRight,
+  alignTop,
+  alignCenterV,
+  alignBottom,
+  distributeH,
+  distributeV,
+  type FieldMove,
+} from "./badgeAlign";
+import { fmtUnit, unitLabel, type Unit } from "./units";
 import { BadgeSidebar } from "./BadgeSidebar";
 import { BadgePreview } from "./BadgePreview";
 import { BadgeSetupDialog, type PanelConfig } from "./BadgeSetupDialog";
@@ -20,6 +41,7 @@ import { flatten, foldInvertForPage } from "./serialize";
 import { createSampleDocument } from "./sample";
 import type { AttendeeOption, AttendeeProvider, BadgeData } from "./badgeData";
 import {
+  DPI,
   PAGE_COUNT,
   pageRoleForIndex,
   pageRoleLabel,
@@ -43,8 +65,8 @@ export interface BadgeEditorProps {
   attendeeProvider?: AttendeeProvider;
 }
 
-/** Inches → compact string (trims trailing zeros): 4, 5.5, 2.85. */
-const fmtIn = (n: number) => String(+n.toFixed(2));
+/** Reference-grid spacing, in inches. */
+const GRID_SPACING_IN = 0.25;
 
 /** True when a keystroke is going to a form field — don't hijack shortcuts. */
 function isEditableTarget(t: EventTarget | null): boolean {
@@ -87,6 +109,16 @@ export function BadgeEditor({
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activePageIndex, setActivePageIndex] = useState(0);
+  // View options (mirror the map editor): a reference grid, snap-to-grid, and
+  // inch rulers. Rulers are shown by default; the grid and snapping are opt-in
+  // so the canvas stays clean and free dragging (with alignment guides) is the
+  // default feel.
+  const [showGrid, setShowGrid] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useState(false);
+  const [showRulers, setShowRulers] = useState(true);
+  // User-facing measurement unit. The model stays inch-based internally; this
+  // only affects rulers, the setup dialog, and size readouts.
+  const [unit, setUnit] = useState<Unit>("in");
   const [showLayout, setShowLayout] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
@@ -114,6 +146,26 @@ export function BadgeEditor({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const controls = useCanvasControls(containerRef);
+
+  // Center the badge in the canvas (with a margin), scaling down large badges to
+  // fit — used for the initial load and the zoom-reset button, so neither pins
+  // the badge to the top-left corner.
+  const { fitToBounds, hasMeasured } = controls;
+  const fitBadge = useCallback(() => {
+    fitToBounds(
+      { width: doc.panelSize.width * DPI, height: doc.panelSize.height * DPI },
+      { padding: 56, maxScale: 1 },
+    );
+  }, [fitToBounds, doc.panelSize.width, doc.panelSize.height]);
+
+  // On first load, fit once the viewport has been measured. useLayoutEffect so
+  // the fit is applied before the browser paints (no zoom/pan flash).
+  const didFit = useRef(false);
+  useLayoutEffect(() => {
+    if (didFit.current || !hasMeasured) return;
+    didFit.current = true;
+    fitBadge();
+  }, [hasMeasured, fitBadge]);
 
   // Active page (clamped — fold changes can shrink the page count).
   const pageIndex = Math.min(activePageIndex, doc.pages.length - 1);
@@ -206,6 +258,20 @@ export function BadgeEditor({
       );
     },
     [mutateActivePage],
+  );
+
+  // Alignment — operate on the currently-selected fields, committing the moved
+  // positions in one history entry (reuses moveMany).
+  const selectedFields = useMemo(
+    () => activePage.fields.filter((f) => selectedIds.has(f.id)),
+    [activePage.fields, selectedIds],
+  );
+  const runAlign = useCallback(
+    (fn: (fields: BadgeField[]) => FieldMove[]) => {
+      const moves = fn(selectedFields);
+      if (moves.length) moveMany(moves);
+    },
+    [selectedFields, moveMany],
   );
 
   const deleteSelected = useCallback(() => {
@@ -389,42 +455,29 @@ export function BadgeEditor({
     },
   ];
 
+  const viewMenu: MenuEntry[] = [
+    {
+      label: `${showRulers ? "✓ " : "   "}Show Rulers`,
+      onClick: () => setShowRulers((s) => !s),
+    },
+    {
+      label: `${showGrid ? "✓ " : "   "}Show Grid`,
+      onClick: () => setShowGrid((s) => !s),
+    },
+    {
+      label: `${snapToGrid ? "✓ " : "   "}Snap to Grid`,
+      onClick: () => setSnapToGrid((s) => !s),
+    },
+  ];
+
   return (
     <div className="pl-map-editor flex flex-col h-full overflow-hidden">
       <BadgeTopBar
         fileMenuItems={fileMenu}
         editMenuItems={editMenu}
-        debug={debug}
-        onDebugClick={() => setShowLayout((s) => !s)}
-      />
-
-      <div className="flex flex-1 overflow-hidden">
-        <BadgeSidebar
-          name={doc.name ?? "Untitled Badge"}
-          onNameChange={setName}
-          onAddField={addField}
-        />
-
-        {/* Main column — OptionsBar on top, [canvas | properties] below, so the
-            sidebar and OptionsBar sit side by side (like the map editor). */}
-        <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          {/* OptionsBar — z-20 so the attendee-picker dropdown layers above the
-              properties panel below it. */}
-          <div className="relative z-20 flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
-            {!previewMode && doc.pages.length > 1 && (
-              <TabBar
-                tabs={pageTabs}
-                value={String(pageIndex)}
-                onChange={(id) => selectPage(Number(id))}
-                itemClassName="px-3 py-1.5 text-xs"
-              />
-            )}
-            {previewMode && (
-              <span className="text-xs text-gray-500">
-                Full preview · as printed (read-only)
-              </span>
-            )}
-            <div className="flex-1" />
+        viewMenuItems={viewMenu}
+        rightActions={
+          <>
             {attendeeProvider && (
               <AttendeePicker
                 provider={attendeeProvider}
@@ -440,7 +493,68 @@ export function BadgeEditor({
             >
               {previewMode ? "Exit preview" : "Full preview"}
             </Button>
-          </div>
+          </>
+        }
+        debug={debug}
+        onDebugClick={() => setShowLayout((s) => !s)}
+      />
+
+      <div className="flex flex-1 overflow-hidden">
+        <BadgeSidebar
+          name={doc.name ?? "Untitled Badge"}
+          onNameChange={setName}
+          onAddField={addField}
+        />
+
+        {/* Main column — OptionsBar on top, [canvas | properties] below, so the
+            sidebar and OptionsBar sit side by side (like the map editor). */}
+        <div className="flex flex-col flex-1 min-w-0 min-h-0">
+          {/* OptionsBar — page tabs (multi-page), the preview banner, and the
+              alignment tools (multi-select). Hidden when it would be empty. */}
+          {(() => {
+            const showAlign = !previewMode && selectedFields.length > 1;
+            if (!previewMode && doc.pages.length <= 1 && !showAlign) return null;
+            return (
+              <div className="relative z-20 flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
+                {!previewMode && doc.pages.length > 1 && (
+                  <TabBar
+                    tabs={pageTabs}
+                    value={String(pageIndex)}
+                    onChange={(id) => selectPage(Number(id))}
+                    itemClassName="px-3 py-1.5 text-xs"
+                  />
+                )}
+                {previewMode && (
+                  <span className="text-xs text-gray-500">
+                    Full preview · as printed (read-only)
+                  </span>
+                )}
+                <div className="flex-1" />
+                {showAlign && (
+                  <div className="flex items-center gap-0.5">
+                    <AlignmentControls
+                      onAlignLeft={() => runAlign(alignLeft)}
+                      onAlignCenterH={() => runAlign(alignCenterH)}
+                      onAlignRight={() => runAlign(alignRight)}
+                      onAlignTop={() => runAlign(alignTop)}
+                      onAlignCenterV={() => runAlign(alignCenterV)}
+                      onAlignBottom={() => runAlign(alignBottom)}
+                      onDistributeH={
+                        selectedFields.length >= 3
+                          ? () => runAlign(distributeH)
+                          : undefined
+                      }
+                      onDistributeV={
+                        selectedFields.length >= 3
+                          ? () => runAlign(distributeV)
+                          : undefined
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Inner row — canvas + properties, below the OptionsBar */}
           <div className="flex flex-1 overflow-hidden">
@@ -454,12 +568,17 @@ export function BadgeEditor({
 
           {previewMode ? (
             <div className="flex-1 min-h-0 overflow-hidden">
-              <BadgePreview doc={doc} data={previewData} />
+              <BadgePreview
+                doc={doc}
+                data={previewData}
+                showRulers={showRulers}
+                unit={unit}
+              />
             </div>
           ) : (
             <div
               ref={containerRef}
-              className="flex-1 min-h-0 overflow-hidden bg-gray-100"
+              className="relative flex-1 min-h-0 overflow-hidden bg-gray-100"
             >
               <BadgeCanvas
                 page={activePage}
@@ -469,6 +588,9 @@ export function BadgeEditor({
                 isFrontPage={pageIndex === 0}
                 foldTop={foldTop}
                 foldBottom={foldBottom}
+                showGrid={showGrid}
+                snapToGrid={snapToGrid}
+                gridSpacingPx={GRID_SPACING_IN * DPI}
                 selectedIds={selectedIds}
                 onFieldMouseDown={selectField}
                 onClearSelection={clearSelection}
@@ -482,26 +604,35 @@ export function BadgeEditor({
                 onWheel={controls.handleWheel}
                 onPositionChange={controls.setPosition}
               />
+              <BadgeRulers
+                visible={showRulers}
+                scale={controls.scale}
+                position={controls.position}
+                stageSize={controls.stageSize}
+                ppi={DPI}
+                unit={unit}
+              />
             </div>
           )}
           {/* Footer — page + overall badge size, and zoom (mirrors StatusBar) */}
           <div className="relative z-20 flex items-center justify-between px-3 py-1.5 bg-white border-t border-gray-200 text-xs text-gray-500">
             <div className="flex items-center gap-2">
               <span>
-                Page {fmtIn(doc.panelSize.width)} ×{" "}
-                {fmtIn(doc.panelSize.height)}"
+                Page {fmtUnit(doc.panelSize.width, unit)} ×{" "}
+                {fmtUnit(doc.panelSize.height, unit)} {unitLabel[unit]}
               </span>
               <span className="text-gray-300">·</span>
               <span>
-                Badge {fmtIn(doc.panelSize.width)} ×{" "}
-                {fmtIn(doc.panelSize.height * doc.pages.length)}"
+                Badge {fmtUnit(doc.panelSize.width, unit)} ×{" "}
+                {fmtUnit(doc.panelSize.height * doc.pages.length, unit)}{" "}
+                {unitLabel[unit]}
               </span>
             </div>
             <IconButton
               size="sm"
-              onClick={controls.zoomReset}
+              onClick={fitBadge}
               className="px-2 w-auto text-xs text-gray-500"
-              title="Click to reset zoom"
+              title="Click to fit badge in view"
             >
               {Math.round(controls.scale * 100)}%
             </IconButton>
@@ -556,6 +687,8 @@ export function BadgeEditor({
           panelSize={doc.panelSize}
           pages={doc.pages}
           slots={doc.slots ?? "none"}
+          unit={unit}
+          onUnitChange={setUnit}
           onApply={applySetup}
           onClose={() => setShowSetup(false)}
         />

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   PiCursorFill,
+  PiHandFill,
   PiPaintBrush,
   PiEraser,
   PiSquare,
@@ -34,6 +35,13 @@ interface ToolDef<T extends string> {
 // ---------------------------------------------------------------------------
 // Tool lists
 // ---------------------------------------------------------------------------
+
+const handDef: ToolDef<ActiveTool> = {
+  id: "hand",
+  label: "Hand (pan)",
+  shortcut: "H",
+  icon: <PiHandFill size={16} />,
+};
 
 const selectDef: ToolDef<ActiveTool> = {
   id: "select",
@@ -91,6 +99,7 @@ function SidebarHeader({
   onEditorModeChange,
   isDirty,
   objectsState,
+  placementIcon = <PiStorefront size={16} />,
 }: {
   mapName: string;
   onMapNameChange: (name: string) => void;
@@ -100,6 +109,9 @@ function SidebarHeader({
   isDirty?: boolean;
   /** Capability of the "objects" feature, gating the Placement Mode toggle. */
   objectsState: FeatureMap["objects"];
+  /** Icon for the Placement (object) mode button — booths by default, tables
+   *  for the seatplanner. */
+  placementIcon?: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(mapName);
@@ -160,11 +172,20 @@ function SidebarHeader({
           {mapName}
         </button>
       )}
+      {/* Design mode is the default state, so its button sits on the left. */}
+      <IconButton
+        size="sm"
+        active={editorMode === "design"}
+        onClick={() => onEditorModeChange("design")}
+        title="Design Mode"
+      >
+        <PiPencilSimple size={16} />
+      </IconButton>
       {objectsState !== "hidden" &&
         (objectsState === "locked" ? (
           <span className="relative inline-flex shrink-0" title="Premium feature">
             <IconButton size="sm" disabled>
-              <PiStorefront size={16} />
+              {placementIcon}
             </IconButton>
             <span className="absolute -top-0.5 -right-0.5 pointer-events-none">
               <TrophyIcon size={12} />
@@ -177,17 +198,9 @@ function SidebarHeader({
             onClick={() => onEditorModeChange("placement")}
             title="Placement Mode"
           >
-            <PiStorefront size={16} />
+            {placementIcon}
           </IconButton>
         ))}
-      <IconButton
-        size="sm"
-        active={editorMode === "design"}
-        onClick={() => onEditorModeChange("design")}
-        title="Design Mode"
-      >
-        <PiPencilSimple size={16} />
-      </IconButton>
     </div>
   );
 }
@@ -252,6 +265,8 @@ interface ToolSidebarProps {
   onToolChange: (tool: ActiveTool) => void;
   onIconSelect?: (iconId: string) => void;
   isPathingMode?: boolean;
+  /** Background layer active — only the background image/color applies (no drawing). */
+  isBackgroundLayer?: boolean;
   activePathingTool?: PathingTool;
   onPathingToolChange?: (tool: PathingTool) => void;
   editorMode: EditorMode;
@@ -269,6 +284,9 @@ interface ToolSidebarProps {
   ) => void;
   /** Resolved usage-tier capabilities. */
   features: FeatureMap;
+  /** Icon for the Placement (object) mode button — booths by default, tables
+   *  for the seatplanner. */
+  placementIcon?: React.ReactNode;
 }
 
 export function ToolSidebar({
@@ -277,6 +295,7 @@ export function ToolSidebar({
   onToolChange,
   onIconSelect,
   isPathingMode,
+  isBackgroundLayer,
   activePathingTool,
   onPathingToolChange,
   editorMode,
@@ -288,6 +307,7 @@ export function ToolSidebar({
   placementRecords,
   onAutoArrange,
   features,
+  placementIcon,
 }: ToolSidebarProps) {
   const iconRowRef = useRef<HTMLDivElement>(null);
   const showIconPicker = activeTool === "icon" && !!onIconSelect;
@@ -318,6 +338,38 @@ export function ToolSidebar({
     );
   }
 
+  // Background layer holds only the map's background image/color (edited in the
+  // properties panel), so the drawing tools don't apply here.
+  if (isBackgroundLayer) {
+    return (
+      <div className="flex flex-col w-64 shrink-0 bg-white border-r border-gray-200 overflow-hidden">
+        <div className="px-3 py-3 border-b border-gray-100">
+          <div className="text-[10px] uppercase tracking-wider text-gray-400 leading-none mb-1">
+            Background Layer
+          </div>
+          <div className="text-base font-semibold text-gray-800 truncate">
+            {mapName}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto py-1 px-1">
+          <ToolRow
+            tool={handDef}
+            isActive={activeTool === "hand"}
+            onClick={() => onToolChange("hand")}
+          />
+          <ToolRow
+            tool={selectDef}
+            isActive={activeTool === "select"}
+            onClick={() => onToolChange("select")}
+          />
+          <p className="px-2 py-3 text-xs text-gray-400 leading-relaxed">
+            Set the background image and color from the panel on the right.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
     <div className="flex flex-col w-64 shrink-0 bg-white border-r border-gray-200 overflow-hidden">
@@ -330,11 +382,17 @@ export function ToolSidebar({
         onEditorModeChange={onEditorModeChange}
         isDirty={isDirty}
         objectsState={features.objects}
+        placementIcon={placementIcon}
       />
 
       {/* Tab content */}
       {editorMode === "design" ? (
         <div className="flex-1 overflow-y-auto py-1 px-1">
+          <ToolRow
+            tool={handDef}
+            isActive={activeTool === "hand"}
+            onClick={() => onToolChange("hand")}
+          />
           <ToolRow
             tool={selectDef}
             isActive={activeTool === "select"}
