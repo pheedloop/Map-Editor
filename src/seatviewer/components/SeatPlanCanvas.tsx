@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Stage, Layer, Rect } from "react-konva";
 import type { FloorPlanData } from "../../types";
 import { useCanvasControls } from "../../editor/hooks/useCanvasControls";
@@ -41,8 +41,29 @@ export function SeatPlanCanvas({
 }: SeatPlanCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoveredTableCode, setHoveredTableCode] = useState<string | null>(null);
-  const { stageRef, scale, position, stageSize, handleWheel, handleDragEnd } =
-    useCanvasControls(containerRef);
+  const {
+    stageRef,
+    scale,
+    position,
+    stageSize,
+    hasMeasured,
+    fitToBounds,
+    handleWheel,
+    handleDragEnd,
+  } = useCanvasControls(containerRef);
+
+  // On first load, fit the whole plan in the viewport (centered, with a margin)
+  // rather than pinning it to the top-left. useLayoutEffect so it's applied
+  // before the browser paints (no zoom/pan flash).
+  const didFit = useRef(false);
+  useLayoutEffect(() => {
+    if (didFit.current || !hasMeasured) return;
+    didFit.current = true;
+    fitToBounds(
+      { width: data.dimensions.width, height: data.dimensions.height },
+      { padding: 48, maxScale: 1 },
+    );
+  }, [hasMeasured, fitToBounds, data.dimensions.width, data.dimensions.height]);
 
   const sortedElements = [...data.elements].sort(
     (a, b) => (a.properties.zIndex ?? 0) - (b.properties.zIndex ?? 0)
