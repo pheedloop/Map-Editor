@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { Button, Dialog, NumberInput, SectionLabel } from "../editor/components/ui";
+import {
+  Button,
+  Dialog,
+  NumberInput,
+  SectionLabel,
+} from "../editor/components/ui";
 import {
   fmtUnit,
   fromUnit,
@@ -58,7 +63,11 @@ interface BadgeSetupDialogProps {
   onClose: () => void;
 }
 
-function panelConfigFor(pages: BadgePage[], fold: FoldType, i: number): PanelConfig {
+function panelConfigFor(
+  pages: BadgePage[],
+  fold: FoldType,
+  i: number,
+): PanelConfig {
   return {
     inverted: pages[i]?.inverted ?? foldInvertForPage(fold, i),
     tearaway: pages[i]?.tearaway ?? false,
@@ -81,7 +90,9 @@ export function BadgeSetupDialog({
   const [h, setH] = useState(panelSize.height);
   const [localSlots, setLocalSlots] = useState<SlotType>(slots);
   const [panels, setPanels] = useState<PanelConfig[]>(() =>
-    Array.from({ length: PAGE_COUNT[fold] }, (_, i) => panelConfigFor(pages, fold, i)),
+    Array.from({ length: PAGE_COUNT[fold] }, (_, i) =>
+      panelConfigFor(pages, fold, i),
+    ),
   );
 
   const count = PAGE_COUNT[localFold];
@@ -92,7 +103,11 @@ export function BadgeSetupDialog({
       Array.from({ length: PAGE_COUNT[f] }, (_, i) =>
         i < prev.length
           ? prev[i]
-          : { inverted: foldInvertForPage(f, i), tearaway: false, tearawayCount: DEFAULT_TEARAWAYS },
+          : {
+              inverted: foldInvertForPage(f, i),
+              tearaway: false,
+              tearawayCount: DEFAULT_TEARAWAYS,
+            },
       ),
     );
   };
@@ -131,7 +146,7 @@ export function BadgeSetupDialog({
               <Button
                 key={o.value}
                 variant="outline"
-                color="neutral"
+                color={localFold === o.value ? "primary" : "neutral"}
                 active={localFold === o.value}
                 className="flex-1"
                 onClick={() => changeFold(o.value)}
@@ -152,7 +167,7 @@ export function BadgeSetupDialog({
               <Button
                 key={u}
                 variant="outline"
-                color="neutral"
+                color={unit === u ? "primary" : "neutral"}
                 active={unit === u}
                 className="flex-1"
                 onClick={() => onUnitChange(u)}
@@ -165,7 +180,12 @@ export function BadgeSetupDialog({
 
         <div className="flex gap-3">
           <DimField label="Panel width" value={w} unit={unit} onChange={setW} />
-          <DimField label="Panel height" value={h} unit={unit} onChange={setH} />
+          <DimField
+            label="Panel height"
+            value={h}
+            unit={unit}
+            onChange={setH}
+          />
         </div>
 
         <div className="text-xs text-gray-500">
@@ -183,7 +203,7 @@ export function BadgeSetupDialog({
               <Button
                 key={o.value}
                 variant="outline"
-                color="neutral"
+                color={localSlots === o.value ? "primary" : "neutral"}
                 active={localSlots === o.value}
                 className="flex-1 text-[11px]"
                 onClick={() => setLocalSlots(o.value)}
@@ -199,7 +219,10 @@ export function BadgeSetupDialog({
             <SectionLabel>Panels</SectionLabel>
             <div className="flex flex-col gap-1.5">
               {panels.map((cfg, i) => (
-                <div key={i} className="flex flex-col gap-1.5 px-2.5 py-2 rounded border border-gray-200">
+                <div
+                  key={i}
+                  className="flex flex-col gap-1.5 px-2.5 py-2 rounded border border-gray-200"
+                >
                   <span className="text-xs font-medium text-gray-700">
                     {pageRoleLabel(pageRoleForIndex(count, i))}
                   </span>
@@ -207,7 +230,9 @@ export function BadgeSetupDialog({
                     <input
                       type="checkbox"
                       checked={cfg.inverted}
-                      onChange={(e) => setPanel(i, { inverted: e.target.checked })}
+                      onChange={(e) =>
+                        setPanel(i, { inverted: e.target.checked })
+                      }
                     />
                     Prints upside-down
                   </label>
@@ -215,7 +240,9 @@ export function BadgeSetupDialog({
                     <input
                       type="checkbox"
                       checked={cfg.tearaway}
-                      onChange={(e) => setPanel(i, { tearaway: e.target.checked })}
+                      onChange={(e) =>
+                        setPanel(i, { tearaway: e.target.checked })
+                      }
                     />
                     Tear-away (perforated stubs)
                   </label>
@@ -225,7 +252,9 @@ export function BadgeSetupDialog({
                       <div className="w-20">
                         <NumberInput
                           value={cfg.tearawayCount}
-                          onChange={(v) => setPanel(i, { tearawayCount: Math.max(1, v) })}
+                          onChange={(v) =>
+                            setPanel(i, { tearawayCount: Math.max(1, v) })
+                          }
                         />
                       </div>
                     </div>
