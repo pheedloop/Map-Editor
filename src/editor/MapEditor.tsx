@@ -6,6 +6,7 @@ import {
   useEffect,
   useLayoutEffect,
 } from "react";
+import { MdOutlineTableBar } from "react-icons/md";
 import type { ActiveTool, EditorMode, PathingTool } from "./types";
 import { usePlacementRecords } from "./hooks/usePlacementRecords";
 import {
@@ -1653,6 +1654,13 @@ export function MapEditor({
           placementRecords={placementRecords}
           onAutoArrange={handleAutoArrange}
           features={featureMap}
+          // Seatplanner places tables; the map product places booths (default).
+          placementIcon={
+            placementCategories.length > 0 &&
+            placementCategories.every((c) => c.elementType === "table") ? (
+              <MdOutlineTableBar size={16} />
+            ) : undefined
+          }
         />
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           {isPathingMode ? (
