@@ -18,6 +18,18 @@ import {
 import { BadgeTopBar, modKey } from "./BadgeTopBar";
 import { BadgeCanvas } from "./BadgeCanvas";
 import { BadgeRulers } from "./BadgeRulers";
+import { AlignmentControls } from "../editor/components/panels/AlignmentControls";
+import {
+  alignLeft,
+  alignCenterH,
+  alignRight,
+  alignTop,
+  alignCenterV,
+  alignBottom,
+  distributeH,
+  distributeV,
+  type FieldMove,
+} from "./badgeAlign";
 import { fmtUnit, unitLabel, type Unit } from "./units";
 import { BadgeSidebar } from "./BadgeSidebar";
 import { BadgePreview } from "./BadgePreview";
@@ -246,6 +258,20 @@ export function BadgeEditor({
       );
     },
     [mutateActivePage],
+  );
+
+  // Alignment — operate on the currently-selected fields, committing the moved
+  // positions in one history entry (reuses moveMany).
+  const selectedFields = useMemo(
+    () => activePage.fields.filter((f) => selectedIds.has(f.id)),
+    [activePage.fields, selectedIds],
+  );
+  const runAlign = useCallback(
+    (fn: (fields: BadgeField[]) => FieldMove[]) => {
+      const moves = fn(selectedFields);
+      if (moves.length) moveMany(moves);
+    },
+    [selectedFields, moveMany],
   );
 
   const deleteSelected = useCallback(() => {
@@ -483,25 +509,52 @@ export function BadgeEditor({
         {/* Main column — OptionsBar on top, [canvas | properties] below, so the
             sidebar and OptionsBar sit side by side (like the map editor). */}
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          {/* OptionsBar — page tabs (multi-page) or the preview banner. Hidden
-              when it would be empty (single-page edit mode). */}
-          {(previewMode || doc.pages.length > 1) && (
-            <div className="relative z-20 flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
-              {!previewMode && doc.pages.length > 1 && (
-                <TabBar
-                  tabs={pageTabs}
-                  value={String(pageIndex)}
-                  onChange={(id) => selectPage(Number(id))}
-                  itemClassName="px-3 py-1.5 text-xs"
-                />
-              )}
-              {previewMode && (
-                <span className="text-xs text-gray-500">
-                  Full preview · as printed (read-only)
-                </span>
-              )}
-            </div>
-          )}
+          {/* OptionsBar — page tabs (multi-page), the preview banner, and the
+              alignment tools (multi-select). Hidden when it would be empty. */}
+          {(() => {
+            const showAlign = !previewMode && selectedFields.length > 1;
+            if (!previewMode && doc.pages.length <= 1 && !showAlign) return null;
+            return (
+              <div className="relative z-20 flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
+                {!previewMode && doc.pages.length > 1 && (
+                  <TabBar
+                    tabs={pageTabs}
+                    value={String(pageIndex)}
+                    onChange={(id) => selectPage(Number(id))}
+                    itemClassName="px-3 py-1.5 text-xs"
+                  />
+                )}
+                {previewMode && (
+                  <span className="text-xs text-gray-500">
+                    Full preview · as printed (read-only)
+                  </span>
+                )}
+                <div className="flex-1" />
+                {showAlign && (
+                  <div className="flex items-center gap-0.5">
+                    <AlignmentControls
+                      onAlignLeft={() => runAlign(alignLeft)}
+                      onAlignCenterH={() => runAlign(alignCenterH)}
+                      onAlignRight={() => runAlign(alignRight)}
+                      onAlignTop={() => runAlign(alignTop)}
+                      onAlignCenterV={() => runAlign(alignCenterV)}
+                      onAlignBottom={() => runAlign(alignBottom)}
+                      onDistributeH={
+                        selectedFields.length >= 3
+                          ? () => runAlign(distributeH)
+                          : undefined
+                      }
+                      onDistributeV={
+                        selectedFields.length >= 3
+                          ? () => runAlign(distributeV)
+                          : undefined
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Inner row — canvas + properties, below the OptionsBar */}
           <div className="flex flex-1 overflow-hidden">
