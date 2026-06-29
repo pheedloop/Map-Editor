@@ -919,27 +919,6 @@ export function MapEditor({
 
     for (const action of config.contextMenu) {
       switch (action) {
-        case "convertToObject":
-          // Offer a conversion to every placement category except the element's
-          // own type — so the available conversions follow the active variant.
-          for (const group of placementRecords) {
-            const { category } = group;
-            if (category.elementType === element.type) continue;
-            items.push({
-              label: category.convertLabel,
-              onClick: () =>
-                updateElementType(contextMenu.elementId, category.elementType, {
-                  color: category.convertColor,
-                }),
-            });
-          }
-          break;
-        case "convertToShape":
-          items.push({
-            label: "Convert to Shape",
-            onClick: () => updateElementType(contextMenu.elementId, "shape"),
-          });
-          break;
         case "delete":
           items.push({
             label: "Delete",
@@ -1928,7 +1907,6 @@ export function MapEditor({
                 }
                 selectNone();
               }}
-              onConvertToBooth={(id) => updateElementType(id, "booth")}
               onBackgroundOpacityChange={(opacity) =>
                 data.backgroundImage &&
                 setBackgroundImage({ ...data.backgroundImage, opacity })

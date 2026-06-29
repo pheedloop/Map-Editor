@@ -41,5 +41,5 @@ export const tableTool: ToolDefinition<DrawingRect | null> = {
   ownsGeometry: ["rect"],
   optionsBar: ["fill", "stroke", "strokeWidth"],
   propertiesPanel: ["name", "capacity", "width", "height", "rotation"],
-  contextMenu: ["convertToObject", "convertToShape", "delete"],
+  contextMenu: ["delete"],
 };

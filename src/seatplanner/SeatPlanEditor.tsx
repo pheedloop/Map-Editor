@@ -24,8 +24,6 @@ export function SeatPlanEditor() {
         getPrimaryLabel: (r) => r.identifier,
         getSecondaryLabel: (r) => `${r.seatCount} seats`,
         getExtraProps: (r) => ({ capacity: r.seatCount }),
-        convertLabel: "Convert to Table",
-        convertColor: "#14b8a6",
       }),
     ],
     [],

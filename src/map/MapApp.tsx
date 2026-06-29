@@ -101,8 +101,6 @@ export function MapApp() {
         defaultShape: "rect",
         getRecordId: (r) => r.slug,
         getPrimaryLabel: (r) => r.code,
-        convertLabel: "Convert to Booth",
-        convertColor: "#3498DB",
       }),
       definePlacementCategory<SessionLocation>({
         id: "sessions",
@@ -115,8 +113,6 @@ export function MapApp() {
         defaultShape: "rect",
         getRecordId: (r) => String(r.id),
         getPrimaryLabel: (r) => r.title,
-        convertLabel: "Convert to Session Location",
-        convertColor: "#27AE60",
       }),
       definePlacementCategory<MeetingRoom>({
         id: "meetingRooms",
@@ -133,8 +129,6 @@ export function MapApp() {
           r.capacity != null ? `${r.capacity} cap.` : null,
         getExtraProps: (r) =>
           r.capacity != null ? { capacity: r.capacity } : {},
-        convertLabel: "Convert to Meeting Room",
-        convertColor: "#F39C12",
       }),
     ],
     [],
