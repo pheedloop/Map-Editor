@@ -450,37 +450,8 @@ export function BadgeEditor({
         fileMenuItems={fileMenu}
         editMenuItems={editMenu}
         viewMenuItems={viewMenu}
-        debug={debug}
-        onDebugClick={() => setShowLayout((s) => !s)}
-      />
-
-      <div className="flex flex-1 overflow-hidden">
-        <BadgeSidebar
-          name={doc.name ?? "Untitled Badge"}
-          onNameChange={setName}
-          onAddField={addField}
-        />
-
-        {/* Main column — OptionsBar on top, [canvas | properties] below, so the
-            sidebar and OptionsBar sit side by side (like the map editor). */}
-        <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          {/* OptionsBar — z-20 so the attendee-picker dropdown layers above the
-              properties panel below it. */}
-          <div className="relative z-20 flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
-            {!previewMode && doc.pages.length > 1 && (
-              <TabBar
-                tabs={pageTabs}
-                value={String(pageIndex)}
-                onChange={(id) => selectPage(Number(id))}
-                itemClassName="px-3 py-1.5 text-xs"
-              />
-            )}
-            {previewMode && (
-              <span className="text-xs text-gray-500">
-                Full preview · as printed (read-only)
-              </span>
-            )}
-            <div className="flex-1" />
+        rightActions={
+          <>
             {attendeeProvider && (
               <AttendeePicker
                 provider={attendeeProvider}
@@ -496,7 +467,41 @@ export function BadgeEditor({
             >
               {previewMode ? "Exit preview" : "Full preview"}
             </Button>
-          </div>
+          </>
+        }
+        debug={debug}
+        onDebugClick={() => setShowLayout((s) => !s)}
+      />
+
+      <div className="flex flex-1 overflow-hidden">
+        <BadgeSidebar
+          name={doc.name ?? "Untitled Badge"}
+          onNameChange={setName}
+          onAddField={addField}
+        />
+
+        {/* Main column — OptionsBar on top, [canvas | properties] below, so the
+            sidebar and OptionsBar sit side by side (like the map editor). */}
+        <div className="flex flex-col flex-1 min-w-0 min-h-0">
+          {/* OptionsBar — page tabs (multi-page) or the preview banner. Hidden
+              when it would be empty (single-page edit mode). */}
+          {(previewMode || doc.pages.length > 1) && (
+            <div className="relative z-20 flex items-center gap-3 px-3 h-[43px] bg-white border-b border-gray-200 shrink-0">
+              {!previewMode && doc.pages.length > 1 && (
+                <TabBar
+                  tabs={pageTabs}
+                  value={String(pageIndex)}
+                  onChange={(id) => selectPage(Number(id))}
+                  itemClassName="px-3 py-1.5 text-xs"
+                />
+              )}
+              {previewMode && (
+                <span className="text-xs text-gray-500">
+                  Full preview · as printed (read-only)
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Inner row — canvas + properties, below the OptionsBar */}
           <div className="flex flex-1 overflow-hidden">
