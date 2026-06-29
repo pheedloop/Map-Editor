@@ -17,6 +17,7 @@ import {
 } from "../editor/components/ui";
 import { BadgeTopBar, modKey } from "./BadgeTopBar";
 import { BadgeCanvas } from "./BadgeCanvas";
+import { BadgeRulers, type RulerUnit } from "./BadgeRulers";
 import { BadgeSidebar } from "./BadgeSidebar";
 import { BadgePreview } from "./BadgePreview";
 import { BadgeSetupDialog, type PanelConfig } from "./BadgeSetupDialog";
@@ -53,6 +54,9 @@ export interface BadgeEditorProps {
 
 /** Inches → compact string (trims trailing zeros): 4, 5.5, 2.85. */
 const fmtIn = (n: number) => String(+n.toFixed(2));
+
+/** Reference-grid spacing, in inches. */
+const GRID_SPACING_IN = 0.25;
 
 /** True when a keystroke is going to a form field — don't hijack shortcuts. */
 function isEditableTarget(t: EventTarget | null): boolean {
@@ -95,6 +99,14 @@ export function BadgeEditor({
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activePageIndex, setActivePageIndex] = useState(0);
+  // View options (mirror the map editor): a reference grid, snap-to-grid, and
+  // inch rulers. Rulers are shown by default; the grid and snapping are opt-in
+  // so the canvas stays clean and free dragging (with alignment guides) is the
+  // default feel.
+  const [showGrid, setShowGrid] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useState(false);
+  const [showRulers, setShowRulers] = useState(true);
+  const [rulerUnit, setRulerUnit] = useState<RulerUnit>("in");
   const [showLayout, setShowLayout] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
@@ -417,11 +429,32 @@ export function BadgeEditor({
     },
   ];
 
+  const viewMenu: MenuEntry[] = [
+    {
+      label: `${showRulers ? "✓ " : "   "}Show Rulers`,
+      onClick: () => setShowRulers((s) => !s),
+    },
+    {
+      label: `   Ruler Units: ${rulerUnit === "cm" ? "Centimeters" : "Inches"}`,
+      disabled: !showRulers,
+      onClick: () => setRulerUnit((u) => (u === "in" ? "cm" : "in")),
+    },
+    {
+      label: `${showGrid ? "✓ " : "   "}Show Grid`,
+      onClick: () => setShowGrid((s) => !s),
+    },
+    {
+      label: `${snapToGrid ? "✓ " : "   "}Snap to Grid`,
+      onClick: () => setSnapToGrid((s) => !s),
+    },
+  ];
+
   return (
     <div className="pl-map-editor flex flex-col h-full overflow-hidden">
       <BadgeTopBar
         fileMenuItems={fileMenu}
         editMenuItems={editMenu}
+        viewMenuItems={viewMenu}
         debug={debug}
         onDebugClick={() => setShowLayout((s) => !s)}
       />
@@ -487,7 +520,7 @@ export function BadgeEditor({
           ) : (
             <div
               ref={containerRef}
-              className="flex-1 min-h-0 overflow-hidden bg-gray-100"
+              className="relative flex-1 min-h-0 overflow-hidden bg-gray-100"
             >
               <BadgeCanvas
                 page={activePage}
@@ -497,6 +530,9 @@ export function BadgeEditor({
                 isFrontPage={pageIndex === 0}
                 foldTop={foldTop}
                 foldBottom={foldBottom}
+                showGrid={showGrid}
+                snapToGrid={snapToGrid}
+                gridSpacingPx={GRID_SPACING_IN * DPI}
                 selectedIds={selectedIds}
                 onFieldMouseDown={selectField}
                 onClearSelection={clearSelection}
@@ -509,6 +545,14 @@ export function BadgeEditor({
                 stageRef={controls.stageRef}
                 onWheel={controls.handleWheel}
                 onPositionChange={controls.setPosition}
+              />
+              <BadgeRulers
+                visible={showRulers}
+                scale={controls.scale}
+                position={controls.position}
+                stageSize={controls.stageSize}
+                ppi={DPI}
+                unit={rulerUnit}
               />
             </div>
           )}

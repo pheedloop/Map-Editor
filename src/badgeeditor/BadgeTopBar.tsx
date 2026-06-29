@@ -9,6 +9,7 @@ export const modKey = isMac ? "⌘" : "Ctrl+";
 interface BadgeTopBarProps {
   fileMenuItems?: MenuEntry[];
   editMenuItems?: MenuEntry[];
+  viewMenuItems?: MenuEntry[];
   onHelpClick?: () => void;
   /** When true, shows the debug affordance (badge_layout JSON viewer). */
   debug?: boolean;
@@ -23,6 +24,7 @@ interface BadgeTopBarProps {
 export function BadgeTopBar({
   fileMenuItems = [],
   editMenuItems = [],
+  viewMenuItems = [],
   onHelpClick,
   debug,
   onDebugClick,
@@ -53,6 +55,7 @@ export function BadgeTopBar({
       </div>
       {menu("file", "File", fileMenuItems)}
       {menu("edit", "Edit", editMenuItems)}
+      {menu("view", "View", viewMenuItems)}
       <div className="flex-1" />
       <MenuButton onClick={onHelpClick} title="Help & Shortcuts">
         <PiQuestion size={16} />
