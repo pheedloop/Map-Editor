@@ -265,6 +265,8 @@ interface ToolSidebarProps {
   onToolChange: (tool: ActiveTool) => void;
   onIconSelect?: (iconId: string) => void;
   isPathingMode?: boolean;
+  /** Background layer active — only the background image/color applies (no drawing). */
+  isBackgroundLayer?: boolean;
   activePathingTool?: PathingTool;
   onPathingToolChange?: (tool: PathingTool) => void;
   editorMode: EditorMode;
@@ -293,6 +295,7 @@ export function ToolSidebar({
   onToolChange,
   onIconSelect,
   isPathingMode,
+  isBackgroundLayer,
   activePathingTool,
   onPathingToolChange,
   editorMode,
@@ -330,6 +333,38 @@ export function ToolSidebar({
               onClick={() => onPathingToolChange(tool.id)}
             />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Background layer holds only the map's background image/color (edited in the
+  // properties panel), so the drawing tools don't apply here.
+  if (isBackgroundLayer) {
+    return (
+      <div className="flex flex-col w-64 shrink-0 bg-white border-r border-gray-200 overflow-hidden">
+        <div className="px-3 py-3 border-b border-gray-100">
+          <div className="text-[10px] uppercase tracking-wider text-gray-400 leading-none mb-1">
+            Background Layer
+          </div>
+          <div className="text-base font-semibold text-gray-800 truncate">
+            {mapName}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto py-1 px-1">
+          <ToolRow
+            tool={handDef}
+            isActive={activeTool === "hand"}
+            onClick={() => onToolChange("hand")}
+          />
+          <ToolRow
+            tool={selectDef}
+            isActive={activeTool === "select"}
+            onClick={() => onToolChange("select")}
+          />
+          <p className="px-2 py-3 text-xs text-gray-400 leading-relaxed">
+            Set the background image and color from the panel on the right.
+          </p>
         </div>
       </div>
     );

@@ -262,6 +262,9 @@ export function MapEditor({
         initWalkableGrid();
         setActivePathingTool("select");
       }
+      // No drawing tools on the background layer — drop back to Select so a
+      // previously-picked drawing tool isn't left active (and inert) there.
+      if (id === "background") setActiveTool("select");
     },
     [initWalkableGrid, featureMap.wayfinding],
   );
@@ -652,9 +655,14 @@ export function MapEditor({
   );
 
   // --- Tool registry integration ---
-  // Resolve active tool string to ToolDefinition (null = select mode)
+  // Resolve active tool string to ToolDefinition (null = select mode). The
+  // background layer holds only the background image/color, so drawing tools
+  // don't apply there — force select mode so shapes can't be drawn into a layer
+  // that never renders them.
   const resolvedTool =
-    activeTool === "select" ? null : (TOOL_MAP.get(activeTool) ?? null);
+    activeTool === "select" || activeLayerId === "background"
+      ? null
+      : (TOOL_MAP.get(activeTool) ?? null);
 
   // Unified tool completion handler (used once tools are migrated to registry)
   const handleToolComplete = useCallback(
@@ -1639,6 +1647,7 @@ export function MapEditor({
           onToolChange={handleToolChange}
           onIconSelect={(iconId) => setActiveIconName(iconId)}
           isPathingMode={activeLayerId === "pathing"}
+          isBackgroundLayer={activeLayerId === "background"}
           activePathingTool={activePathingTool}
           onPathingToolChange={setActivePathingTool}
           // If the tier locks objects, fall back to design mode so the
